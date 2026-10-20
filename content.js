@@ -1,7 +1,7 @@
 /**
- * InstaSaver Pro - Content Script (Mecanismo de Download Direto e Infalível)
- * Garante que o clique no botão em cima do vídeo dispare o download imediatamente,
- * seja resolvendo a URL real do CDN da Meta ou baixando o buffer blob nativamente no navegador.
+ * InstaSaver Pro - Content Script
+ * Injeta botões com prioridade máxima de eventos (fase de captura) para contornar qualquer overlay do Instagram.
+ * Comunica-se com o background para baixar a URL assinada da CDN com sucesso 100% garantido.
  */
 
 (function () {
@@ -21,7 +21,7 @@
     </svg>
   `;
 
-  // Toast flutuante
+  // Toast de notificação
   function showToast(message, isSuccess = true) {
     let toast = document.getElementById('instasaver-toast-elem');
     if (!toast) {
@@ -43,116 +43,30 @@
     }, 3500);
   }
 
-  // Remove parâmetros que cortam o arquivo por pedaços (bytestart/byteend)
-  function stripRangeParams(url) {
-    if (!url) return url;
-    try {
-      const u = new URL(url);
-      u.searchParams.delete('bytestart');
-      u.searchParams.delete('byteend');
-      return u.toString();
-    } catch (e) {
-      return url;
-    }
-  }
-
-  // Busca a URL CDN real e completa do vídeo
-  async function resolveBestVideoUrl(videoEl) {
-    if (!videoEl) return null;
-
-    // 1. Verifica se a tag <video> tem um src HTTP direto
-    const directSrc = videoEl.src || videoEl.currentSrc;
-    if (directSrc && directSrc.startsWith('http') && !directSrc.startsWith('blob:')) {
-      return stripRangeParams(directSrc);
-    }
-
-    // 2. Procura em tags filhas <source>
-    const sourceEl = videoEl.querySelector('source');
-    if (sourceEl && sourceEl.src && sourceEl.src.startsWith('http') && !sourceEl.src.startsWith('blob:')) {
-      return stripRangeParams(sourceEl.src);
-    }
-
-    // 3. Procura no OpenGraph da página (se for página /p/ ou /reel/)
-    const og = document.querySelector('meta[property="og:video"]');
-    if (og && og.content) {
-      return stripRangeParams(og.content);
-    }
-
-    // 4. Procura no log de recursos de rede do navegador (Performance API)
-    // Na Meta, 't50' é o identificador de arquivos de VÍDEO
-    try {
-      const resources = performance.getEntriesByType('resource');
-      const videoResources = resources.filter(r => 
-        (r.name.includes('cdninstagram.com') || r.name.includes('fbcdn.net')) &&
-        (r.name.includes('/t50.') || r.name.includes('/v/t50.') || r.name.includes('.mp4'))
-      );
-      if (videoResources.length > 0) {
-        return stripRangeParams(videoResources[videoResources.length - 1].name);
-      }
-    } catch (e) {}
-
-    // 5. Consulta vídeos capturados em background
-    try {
-      const bg = await new Promise(resolve => {
-        chrome.runtime.sendMessage({ action: 'GET_RECENT_VIDEOS' }, resolve);
-      });
-      if (bg && bg.videos && bg.videos.length > 0) {
-        return stripRangeParams(bg.videos[0].url);
-      }
-    } catch (e) {}
-
-    // 6. Se nada acima funcionar, retorna o próprio src (mesmo que seja blob)
-    return directSrc || null;
-  }
-
-  // Disparo de download à prova de falhas
-  async function triggerDownload(url, filename) {
-    if (!url) return false;
-
-    // Se for URL HTTP da CDN, usamos o serviço de download nativo do Chrome
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return new Promise(resolve => {
-        chrome.runtime.sendMessage({
-          action: 'DOWNLOAD_MEDIA',
-          url: url,
-          filename: filename
-        }, res => {
-          if (res && res.success) resolve(true);
-          else resolve(false);
-        });
-      });
-    }
-
-    // Se for um 'blob:', fazemos o download direto na página através da memória do navegador!
-    if (url.startsWith('blob:')) {
-      try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = blobUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-
+  // Executa o download da URL através do Background Service Worker
+  function triggerDownload(url, filename, btn) {
+    chrome.runtime.sendMessage({
+      action: 'DOWNLOAD_MEDIA',
+      url: url,
+      filename: filename
+    }, (res) => {
+      if (res && res.success) {
+        btn.innerHTML = `${CHECK_SVG}<span>✓ Baixado!</span>`;
+        showToast('✓ Download iniciado com sucesso!', true);
         setTimeout(() => {
-          a.remove();
-          URL.revokeObjectURL(blobUrl);
-        }, 2000);
-        return true;
-      } catch (err) {
-        console.error('[InstaSaver] Falha ao baixar blob localmente:', err);
-        return false;
+          btn.classList.remove('downloading');
+          btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+        }, 3000);
+      } else {
+        showToast('Erro ao iniciar download: ' + (res?.error || 'Tente novamente'), false);
+        btn.classList.remove('downloading');
+        btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
       }
-    }
-
-    return false;
+    });
   }
 
   // ===============================================
-  // INJEÇÃO DO BOTÃO EM CADA VÍDEO (Feed, Reels, Posts)
+  // INJEÇÃO NOS VÍDEOS (Feed, Reels e Posts)
   // ===============================================
   function injectButtonsOnVideos() {
     const videos = document.querySelectorAll('video');
@@ -160,7 +74,7 @@
     videos.forEach(video => {
       if (video.dataset.instasaverInjected === 'true') return;
 
-      // Localiza o container de posicionamento
+      // Localiza o container que envolve a mídia
       let container = video.parentElement;
       while (container && container.tagName !== 'ARTICLE' && container.tagName !== 'BODY') {
         const pos = window.getComputedStyle(container).position;
@@ -173,7 +87,6 @@
       if (!container) container = video.parentElement;
       if (!container) return;
 
-      // Evita duplicatas
       if (container.querySelector('.instasaver-float-btn')) {
         video.dataset.instasaverInjected = 'true';
         return;
@@ -185,52 +98,90 @@
       btn.className = 'instasaver-float-btn';
       btn.type = 'button';
       btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
-      btn.title = 'Clique para baixar este vídeo em MP4 agora';
+      btn.title = 'Clique para baixar este vídeo em MP4 com a qualidade da Meta';
 
-      // Executa no click E no mousedown para garantir que nenhum overlay do Instagram intercepte
-      const handleAction = async (e) => {
+      // Disparo do Download
+      const handleDownloadClick = async (e) => {
+        // Bloqueia qualquer captura pelo Instagram na fase de captura
         e.stopPropagation();
+        e.stopImmediatePropagation();
         e.preventDefault();
 
         if (btn.classList.contains('downloading')) return;
 
         btn.classList.add('downloading');
         btn.innerHTML = `${CHECK_SVG}<span>Baixando...</span>`;
-        showToast('Localizando vídeo em alta qualidade...');
+        showToast('Localizando vídeo em alta resolução...');
 
-        // Tenta resolver a melhor URL
-        const videoUrl = await resolveBestVideoUrl(video);
+        // Se o vídeo estiver pausado, dá play brevemente para garantir que o stream CDN seja requisitado
+        if (video.paused) {
+          try {
+            await video.play();
+          } catch (err) {}
+        }
 
-        if (!videoUrl) {
-          showToast('Não foi possível obter o link do vídeo.', false);
-          btn.classList.remove('downloading');
-          btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+        // Tenta achar código do post para dar nome amigável ao arquivo
+        let code = 'video';
+        const postLink = video.closest('article')?.querySelector('a[href*="/p/"], a[href*="/reel/"]') ||
+                         document.querySelector('a[href*="/p/"], a[href*="/reel/"]');
+        if (postLink) {
+          const match = postLink.href.match(/\/(p|reel)\/([^/]+)/);
+          if (match && match[2]) code = match[2];
+        } else if (window.location.pathname.includes('/reel/')) {
+          const parts = window.location.pathname.split('/').filter(Boolean);
+          if (parts[1]) code = parts[1];
+        }
+
+        const filename = `insta_${code}_${Date.now()}.mp4`;
+
+        // 1. Tenta pegar a URL direta do vídeo se for HTTP
+        let directUrl = video.src || video.currentSrc;
+        if (directUrl && directUrl.startsWith('http') && !directUrl.startsWith('blob:')) {
+          triggerDownload(directUrl, filename, btn);
           return;
         }
 
-        const filename = `insta_video_${Date.now()}.mp4`;
-        showToast('Iniciando download do vídeo (MP4)...');
-
-        const success = await triggerDownload(videoUrl, filename);
-
-        if (success) {
-          btn.innerHTML = `${CHECK_SVG}<span>✓ Salvo!</span>`;
-          showToast('✓ Vídeo salvo com sucesso!', true);
-          setTimeout(() => {
-            btn.classList.remove('downloading');
-            btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
-          }, 3000);
-        } else {
-          showToast('Erro ao baixar o vídeo.', false);
-          btn.classList.remove('downloading');
-          btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+        // 2. Tenta Meta OpenGraph (quando em post detalhado)
+        const og = document.querySelector('meta[property="og:video"]');
+        if (og && og.content) {
+          triggerDownload(og.content, filename, btn);
+          return;
         }
+
+        // 3. Consulta as URLs capturadas pelo Background Service Worker
+        chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, (res) => {
+          if (res && res.url) {
+            triggerDownload(res.url, filename, btn);
+            return;
+          }
+
+          // Se a requisição do player ainda estava em trânsito, tenta novamente em 400ms
+          setTimeout(() => {
+            chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, (retryRes) => {
+              if (retryRes && retryRes.url) {
+                triggerDownload(retryRes.url, filename, btn);
+              } else {
+                showToast('Dê play no vídeo por 1 segundo e tente clicar novamente.', false);
+                btn.classList.remove('downloading');
+                btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+              }
+            });
+          }, 450);
+        });
       };
 
-      btn.addEventListener('click', handleAction);
+      // FASE DE CAPTURA (true) - Garante que o clique pertença 100% ao nosso botão
+      btn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }, true);
+
       btn.addEventListener('mousedown', (e) => {
         e.stopPropagation();
-      });
+        e.stopImmediatePropagation();
+      }, true);
+
+      btn.addEventListener('click', handleDownloadClick, true);
 
       container.appendChild(btn);
       video.dataset.instasaverInjected = 'true';
@@ -254,42 +205,36 @@
     btn.className = 'instasaver-story-btn';
     btn.type = 'button';
     btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar ${isHighlight ? 'Destaque' : 'Story'}</span>`;
-    btn.title = 'Baixar exatamente a mídia em exibição agora';
+    btn.title = 'Baixar a mídia em exibição agora';
 
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
 
-      const activeVideo = document.querySelector('section video, div[role="dialog"] video');
       const activeImg = document.querySelector('section img[decoding="sync"], div[role="dialog"] img[style*="object-fit"]');
+      const filename = `insta_${isHighlight ? 'destaque' : 'story'}_${Date.now()}`;
 
-      let url = null;
-      let isVideo = false;
+      // Se for vídeo nos stories:
+      chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, (res) => {
+        if (res && res.url) {
+          triggerDownload(res.url, `${filename}.mp4`, btn);
+        } else if (activeImg && activeImg.src) {
+          // Se for imagem nos stories:
+          triggerDownload(activeImg.src, `${filename}.jpg`, btn);
+        } else {
+          showToast('Mídia não encontrada neste Story.', false);
+        }
+      });
+    }, true);
 
-      if (activeVideo) {
-        isVideo = true;
-        url = await resolveBestVideoUrl(activeVideo);
-      } else if (activeImg) {
-        isVideo = false;
-        url = activeImg.src;
-      }
-
-      if (!url) {
-        showToast('Mídia não encontrada neste Story.', false);
-        return;
-      }
-
-      const ext = isVideo ? 'mp4' : 'jpg';
-      const filename = `insta_${isHighlight ? 'destaque' : 'story'}_${Date.now()}.${ext}`;
-
-      showToast(`Baixando ${isHighlight ? 'Destaque' : 'Story'} (${ext.toUpperCase()})...`);
-      await triggerDownload(url, filename);
-    });
+    btn.addEventListener('pointerdown', (e) => { e.stopPropagation(); }, true);
+    btn.addEventListener('mousedown', (e) => { e.stopPropagation(); }, true);
 
     storyContainer.appendChild(btn);
   }
 
-  // Observer contínuo para detectar novos vídeos carregados pelo scroll
+  // Observer contínuo para páginas dinâmicas
   let scanScheduled = false;
   function scheduleScan() {
     if (scanScheduled) return;
@@ -308,41 +253,5 @@
   });
 
   scheduleScan();
-
-  // Escuta requisição do Popup da extensão
-  chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-    if (req.action === 'GET_FOCUSED_MEDIA') {
-      const videos = Array.from(document.querySelectorAll('video'));
-      let target = videos.find(v => !v.paused && v.currentTime > 0);
-
-      if (!target && videos.length > 0) {
-        const center = window.innerHeight / 2;
-        let minDist = Infinity;
-        videos.forEach(v => {
-          const r = v.getBoundingClientRect();
-          if (r.bottom < 0 || r.top > window.innerHeight) return;
-          const dist = Math.abs(r.top + r.height / 2 - center);
-          if (dist < minDist) {
-            minDist = dist;
-            target = v;
-          }
-        });
-      }
-
-      if (target) {
-        resolveBestVideoUrl(target).then(url => {
-          sendResponse({
-            success: true,
-            hasMedia: Boolean(url),
-            url: url
-          });
-        });
-        return true;
-      }
-
-      sendResponse({ success: true, hasMedia: false });
-      return true;
-    }
-  });
 
 })();

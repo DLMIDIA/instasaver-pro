@@ -1,5 +1,5 @@
 /**
- * InstaSaver Pro - Popup Controller (Focado & Preciso)
+ * InstaSaver Pro - Popup Controller
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let activeMediaUrl = null;
 
-  // 1. Botão de abrir Instagram
   if (openInstaBtn) {
     openInstaBtn.addEventListener('click', () => {
       chrome.runtime.sendMessage({ action: 'OPEN_INSTAGRAM' });
@@ -25,7 +24,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 2. Consulta aba ativa
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tabs || !tabs.length) return;
 
@@ -45,9 +43,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   instaView.classList.remove('hidden');
   statusBadge.textContent = 'Ativo no Instagram';
 
-  // 3. Consulta mídia em foco/reprodução na tela
-  chrome.tabs.sendMessage(currentTab.id, { action: 'GET_FOCUSED_MEDIA' }, (res) => {
-    if (res && res.hasMedia && res.url) {
+  // Consulta o vídeo mais recente capturado pelo background
+  chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO', tabId: currentTab.id }, (res) => {
+    if (res && res.url) {
       activeMediaUrl = res.url;
       focusedVideoPreview.src = res.url;
       focusedMediaCard.classList.remove('hidden');
@@ -56,7 +54,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 4. Download do vídeo em foco
   if (downloadFocusedBtn) {
     downloadFocusedBtn.addEventListener('click', () => {
       if (!activeMediaUrl) return;
@@ -85,7 +82,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 5. Ir para link
   if (goLinkBtn) {
     goLinkBtn.addEventListener('click', () => {
       const val = directLinkInput.value.trim();

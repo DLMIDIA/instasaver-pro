@@ -1,25 +1,13 @@
 /**
  * InstaSaver Pro - Background Service Worker
- * Intercepta URLs das CDNs da Meta (t50 para vídeos) e remove parâmetros de corte (bytestart/byteend)
- * para fornecer o download do arquivo MP4 completo e com som.
+ * Captura URLs originais e assinadas da CDN da Meta em tempo real.
+ * Não altera os parâmetros de assinatura (oh/oe) para garantir HTTP 200 no download.
  */
 
-const videoUrlsByTab = new Map();
-const MAX_CACHE = 30;
+const capturedVideosByTab = new Map();
+const MAX_CACHE = 20;
 
-// Remove parâmetros de corte da URL para que o CDN envie o vídeo inteiro
-function stripRangeParams(url) {
-  try {
-    const u = new URL(url);
-    u.searchParams.delete('bytestart');
-    u.searchParams.delete('byteend');
-    return u.toString();
-  } catch (e) {
-    return url;
-  }
-}
-
-// Intercepta todas as requisições de mídia da CDN do Instagram
+// Interceptador de mídia em tempo real
 if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
   chrome.webRequest.onResponseStarted.addListener(
     (details) => {
@@ -43,12 +31,11 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
 
         let isVideo = false;
 
-        // Na CDN da Meta, 't50' é o identificador oficial de fluxos de VÍDEO
+        // Na Meta, 't50' identifica fluxos de VÍDEO
         if (url.includes('/t50.') || url.includes('/v/t50.') || url.includes('.mp4')) {
           isVideo = true;
         }
 
-        // Checagem por cabeçalho Content-Type
         if (responseHeaders && !isVideo) {
           for (const h of responseHeaders) {
             if (h.name.toLowerCase() === 'content-type') {
@@ -62,16 +49,16 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
         }
 
         if (isVideo) {
-          if (!videoUrlsByTab.has(tabId)) {
-            videoUrlsByTab.set(tabId, []);
+          if (!capturedVideosByTab.has(tabId)) {
+            capturedVideosByTab.set(tabId, []);
           }
-          const list = videoUrlsByTab.get(tabId);
-          const fullVideoUrl = stripRangeParams(url);
+          const list = capturedVideosByTab.get(tabId);
 
-          const exists = list.some(item => item.url === fullVideoUrl);
+          // Salva a URL original sem mexer na assinatura criptográfica
+          const exists = list.some(item => item.url === url);
           if (!exists) {
             list.unshift({
-              url: fullVideoUrl,
+              url: url,
               timestamp: Date.now()
             });
 
@@ -81,7 +68,7 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
           }
         }
       } catch (err) {
-        console.error('[InstaSaver] Erro ao monitorar CDN:', err);
+        console.error('[InstaSaver] Erro ao capturar requisição:', err);
       }
     },
     {
@@ -94,29 +81,30 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
   );
 }
 
-// Limpeza de cache
+// Limpeza de abas fechadas
 chrome.tabs.onRemoved.addListener((tabId) => {
-  videoUrlsByTab.delete(tabId);
+  capturedVideosByTab.delete(tabId);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === 'loading' && changeInfo.url && !changeInfo.url.includes('instagram.com')) {
-    videoUrlsByTab.delete(tabId);
+    capturedVideosByTab.delete(tabId);
   }
 });
 
-// Comunicação
+// Comunicação com Content Script e Popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = (sender && sender.tab && sender.tab.id) || message.tabId;
 
-  // Retorna os vídeos reais capturados para esta aba
-  if (message.action === 'GET_RECENT_VIDEOS') {
-    const list = videoUrlsByTab.get(tabId) || [];
-    sendResponse({ success: true, videos: list });
+  // Retorna o vídeo mais recente capturado na aba
+  if (message.action === 'GET_LATEST_VIDEO') {
+    const list = capturedVideosByTab.get(tabId) || [];
+    const latest = list.length > 0 ? list[0].url : null;
+    sendResponse({ success: true, url: latest });
     return true;
   }
 
-  // Executa o download via API oficial do Chrome
+  // Executa o download oficial do arquivo
   if (message.action === 'DOWNLOAD_MEDIA') {
     const { url, filename, saveAs } = message;
     if (!url) {
@@ -124,16 +112,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    const cleanUrl = stripRangeParams(url);
     const safeFilename = (filename || `insta_video_${Date.now()}.mp4`).replace(/[/\\?%*:|"<>]/g, '_').trim();
 
     chrome.downloads.download({
-      url: cleanUrl,
+      url: url,
       filename: safeFilename,
       saveAs: Boolean(saveAs)
     }, (downloadId) => {
       if (chrome.runtime.lastError) {
-        console.warn('[InstaSaver] Falha no chrome.downloads:', chrome.runtime.lastError.message);
+        console.warn('[InstaSaver] Falha download:', chrome.runtime.lastError.message);
         sendResponse({ success: false, error: chrome.runtime.lastError.message });
       } else {
         sendResponse({ success: true, downloadId });
