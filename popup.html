@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InstaSaver Pro</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <img src="icons/icon32.png" alt="InstaSaver Logo" class="brand-logo">
+        <div>
+          <h1 class="brand-title">InstaSaver <span>PRO</span></h1>
+          <p class="brand-subtitle">Baixador de Mídias Instagram</p>
+        </div>
+      </div>
+      <div id="pageBadge" class="page-badge badge-neutral">Detectando...</div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-detect">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm0-4H9V7h2v5zm4 4h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+        </svg>
+        Mídias na Tela
+      </button>
+      <button class="tab-btn" data-tab="tab-link">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+        </svg>
+        Colar Link
+      </button>
+      <button class="tab-btn" data-tab="tab-settings">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+        </svg>
+      </button>
+    </nav>
+
+    <!-- TAB 1: Mídias Detectadas -->
+    <div id="tab-detect" class="tab-content active">
+      <div id="notInstagramState" class="empty-state hidden">
+        <div class="empty-icon">📷</div>
+        <h3>Instagram não detectado</h3>
+        <p>Abra uma página do Instagram (Feed, Reels, Story ou Destaque) para começar a baixar mídias com 1 clique.</p>
+        <button id="openInstagramBtn" class="btn btn-primary">
+          Abrir Instagram Web
+        </button>
+      </div>
+
+      <div id="mediaDetectedState">
+        <!-- Barra de Ações Rápidas -->
+        <div class="quick-actions-bar">
+          <button id="downloadAllBtn" class="btn btn-gradient btn-full">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span id="downloadAllText">Baixar Todos os Itens</span>
+          </button>
+        </div>
+
+        <!-- Lista / Grid de Mídias -->
+        <div id="mediaListContainer" class="media-grid">
+          <!-- Gerado via JavaScript -->
+        </div>
+
+        <!-- Se nenhuma mídia for achada na página atual -->
+        <div id="noMediaFoundMsg" class="empty-media hidden">
+          <p>Nenhuma mídia encontrada nesta visualização ainda.</p>
+          <p class="subtext">Dê play no vídeo ou abra um Story/Post para carregar.</p>
+          <button id="refreshScanBtn" class="btn btn-secondary btn-sm">Escanear Novamente</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Colar Link Direto -->
+    <div id="tab-link" class="tab-content">
+      <div class="link-download-box">
+        <label for="linkInput" class="input-label">Link do Post, Reel, Story ou Perfil:</label>
+        <div class="input-group">
+          <input type="text" id="linkInput" placeholder="https://www.instagram.com/reel/..." spellcheck="false" autocomplete="off">
+          <button id="pasteBtn" class="btn btn-sm btn-outline">Colar</button>
+        </div>
+        <p class="help-text">Você pode colar links diretos de Reels, publicações do feed ou perfis públicos.</p>
+        <button id="goToLinkBtn" class="btn btn-gradient btn-full mt-3">
+          Acessar e Baixar Mídia
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 3: Ajustes -->
+    <div id="tab-settings" class="tab-content">
+      <div class="settings-box">
+        <h3>Preferências</h3>
+
+        <div class="setting-item">
+          <div>
+            <label class="setting-label">Botões na Tela do Instagram</label>
+            <p class="setting-desc">Exibe botões rápidos de download direto nos Stories, Feed e Reels.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggleInPageBtns" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-item">
+          <div>
+            <label class="setting-label">Prefixo do Arquivo</label>
+            <p class="setting-desc">Nome com o qual o arquivo será salvo no computador.</p>
+          </div>
+          <input type="text" id="prefixInput" class="input-text-sm" value="insta_">
+        </div>
+
+        <div class="info-card">
+          <h4>💡 Vantagem da Compressão Leve</h4>
+          <p>Esta extensão baixa a versão gerada pelos servidores da Meta/Instagram. Ela possui a melhor relação de compressão x nitidez, tornando os arquivos perfeitos para envio rápido no WhatsApp, Reels e repasses sem consumir espaço excessivo.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Status -->
+    <footer class="app-footer">
+      <span class="version-label">InstaSaver Pro v1.0 • 100% Grátis & Sem Ads</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

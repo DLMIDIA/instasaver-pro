@@ -1,0 +1,6 @@
+.DS_Store
+*.zip
+*.log
+.gemini/
+__pycache__/
+*.pyc
