@@ -1,22 +1,27 @@
 /**
  * InstaSaver Pro - Content Script
- * Injeta botões nativos de download em Stories, Destaques, Feed e Reels.
- * Escaneia mídias para a interface da extensão.
+ * Injeta botão flutuante preciso diretamente sobre cada vídeo ou foto do Instagram ao passar o mouse.
+ * Garante que apenas o arquivo selecionado seja baixado, sem acumular lixo ou arquivos corrompidos.
  */
 
 (function () {
   'use strict';
 
-  // SVG do ícone de Download
-  const DOWNLOAD_ICON_SVG = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  const DOWNLOAD_SVG = `
+    <svg viewBox="0 0 24 24">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
       <polyline points="7 10 12 15 17 10"></polyline>
       <line x1="12" y1="15" x2="12" y2="3"></line>
     </svg>
   `;
 
-  // Toast Notification
+  const CHECK_SVG = `
+    <svg viewBox="0 0 24 24">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  `;
+
+  // Toast Flutuante Discreto
   function showToast(message, isSuccess = true) {
     let toast = document.getElementById('instasaver-toast-elem');
     if (!toast) {
@@ -26,322 +31,342 @@
       document.body.appendChild(toast);
     }
 
-    const icon = isSuccess 
-      ? '<span style="color:#4ade80;font-size:16px;">✓</span>' 
-      : '<span style="color:#f87171;font-size:16px;">✕</span>';
-
-    toast.innerHTML = `<span class="instasaver-toast-icon">${icon}</span> <span>${message}</span>`;
+    toast.className = 'instasaver-toast' + (isSuccess ? ' success' : '');
+    toast.innerHTML = isSuccess 
+      ? `<span style="color:#22c55e;font-size:16px;">✓</span> <span>${message}</span>`
+      : `<span style="color:#ef4444;font-size:16px;">✕</span> <span>${message}</span>`;
+    
     toast.classList.add('show');
-
     clearTimeout(toast._timeout);
     toast._timeout = setTimeout(() => {
       toast.classList.remove('show');
-    }, 3500);
+    }, 3200);
   }
 
-  // Busca melhor URL de CDN para vídeos, contornando blob:
-  async function resolveMediaUrl(element, isVideo) {
-    if (!element) return null;
+  // Resolve a URL limpa do vídeo (contornando blob:)
+  async function getCleanVideoUrl(videoEl) {
+    if (!videoEl) return null;
 
-    let directSrc = element.src || element.currentSrc;
-    if (directSrc && !directSrc.startsWith('blob:')) {
-      return directSrc;
+    let direct = videoEl.src || videoEl.currentSrc;
+    if (direct && !direct.startsWith('blob:') && direct.startsWith('http')) {
+      return sanitizeUrl(direct);
     }
 
-    // Procura em tags <source>
-    const source = element.querySelector('source');
-    if (source && source.src && !source.src.startsWith('blob:')) {
-      return source.src;
+    // 1. Tenta tag <source>
+    const srcTag = videoEl.querySelector('source');
+    if (srcTag && srcTag.src && !srcTag.src.startsWith('blob:')) {
+      return sanitizeUrl(srcTag.src);
     }
 
-    // Se for blob:, consulta o log de rede da página (Performance API)
+    // 2. Tenta Meta OpenGraph (quando em tela de post /p/ ou /reel/)
+    const og = document.querySelector('meta[property="og:video"]');
+    if (og && og.content) {
+      return sanitizeUrl(og.content);
+    }
+
+    // 3. Consulta Performance API por requisições .mp4 da CDN
     try {
       const resources = performance.getEntriesByType('resource');
-      const videoResources = resources.filter(r => 
+      const mp4s = resources.filter(r => 
         (r.name.includes('cdninstagram.com') || r.name.includes('fbcdn.net')) &&
-        (r.name.includes('.mp4') || r.name.includes('/v/t50.') || r.initiatorType === 'video' || r.initiatorType === 'fetch' || r.initiatorType === 'xmlhttprequest')
+        (r.name.includes('.mp4') || r.name.includes('/v/t50.'))
       );
-
-      if (videoResources.length > 0) {
-        // Pega a requisição mais recente compatível
-        return videoResources[videoResources.length - 1].name;
-      }
-    } catch (e) {
-      console.warn('[InstaSaver] Falha ao ler Performance API:', e);
-    }
-
-    // Fallback: consulta mídias interceptadas no background
-    try {
-      const response = await new Promise(resolve => {
-        chrome.runtime.sendMessage({ action: 'GET_SNIFFED_MEDIA' }, resolve);
-      });
-      if (response && response.media && response.media.length > 0) {
-        const match = response.media.find(m => isVideo ? m.type === 'video' : m.type === 'image');
-        if (match) return match.url;
+      if (mp4s.length > 0) {
+        return sanitizeUrl(mp4s[mp4s.length - 1].name);
       }
     } catch (e) {}
 
-    return directSrc || null;
+    // 4. Consulta cache do background
+    try {
+      const bg = await new Promise(resolve => {
+        chrome.runtime.sendMessage({ action: 'GET_RECENT_MEDIA' }, resolve);
+      });
+      if (bg && bg.media && bg.media.length > 0) {
+        const v = bg.media.find(m => m.type === 'video');
+        if (v) return sanitizeUrl(v.url);
+      }
+    } catch (e) {}
+
+    return direct ? sanitizeUrl(direct) : null;
   }
 
-  // 1. Injeção em Stories e Destaques
+  // Remove range truncado de bytes para baixar o arquivo completo
+  function sanitizeUrl(url) {
+    try {
+      const u = new URL(url);
+      u.searchParams.delete('bytestart');
+      u.searchParams.delete('byteend');
+      return u.toString();
+    } catch (e) {
+      return url;
+    }
+  }
+
+  // ==========================================
+  // 1. INJEÇÃO DE BOTÃO EM VÍDEOS (Feed & Reels)
+  // ==========================================
+  function injectButtonsOnVideos() {
+    const videos = document.querySelectorAll('video');
+
+    videos.forEach(video => {
+      // Ignora se já estiver com botão
+      if (video.dataset.instasaverInjected === 'true') return;
+
+      // Encontra o container direto ou mais próximo que envolve o vídeo
+      let container = video.parentElement;
+      while (container && container.tagName !== 'ARTICLE' && container.tagName !== 'BODY') {
+        const style = window.getComputedStyle(container);
+        if (style.position === 'relative' || style.position === 'absolute' || container.getAttribute('role') === 'button') {
+          break;
+        }
+        container = container.parentElement;
+      }
+
+      if (!container || container.querySelector('.instasaver-float-btn[data-type="video"]')) {
+        video.dataset.instasaverInjected = 'true';
+        return;
+      }
+
+      container.classList.add('instasaver-media-wrapper');
+
+      const btn = document.createElement('button');
+      btn.className = 'instasaver-float-btn';
+      btn.dataset.type = 'video';
+      btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+      btn.title = 'Clique para baixar este vídeo em MP4 (qualidade original da Meta)';
+
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        btn.classList.add('downloading');
+        btn.innerHTML = `${CHECK_SVG}<span>Baixando...</span>`;
+
+        const videoUrl = await getCleanVideoUrl(video);
+        if (!videoUrl) {
+          showToast('Não foi possível capturar o link deste vídeo.', false);
+          btn.classList.remove('downloading');
+          btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+          return;
+        }
+
+        const filename = `insta_video_${Date.now()}.mp4`;
+        showToast('Baixando vídeo selecionado (MP4)...');
+
+        chrome.runtime.sendMessage({
+          action: 'DOWNLOAD_MEDIA',
+          url: videoUrl,
+          filename: filename
+        }, (res) => {
+          if (res && res.success) {
+            btn.innerHTML = `${CHECK_SVG}<span>✓ Salvo!</span>`;
+            setTimeout(() => {
+              btn.classList.remove('downloading');
+              btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+            }, 3000);
+          } else {
+            showToast('Erro ao iniciar o download.', false);
+            btn.classList.remove('downloading');
+            btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+          }
+        });
+      });
+
+      container.appendChild(btn);
+      video.dataset.instasaverInjected = 'true';
+    });
+  }
+
+  // ==========================================
+  // 2. INJEÇÃO DE BOTÃO EM FOTOS REAIS DE POST
+  // ==========================================
+  function injectButtonsOnPhotos() {
+    // Apenas imagens grandes de posts (ignora avatares, stories e miniaturas < 300px)
+    const images = document.querySelectorAll('article img[style*="object-fit"], div[role="dialog"] article img');
+
+    images.forEach(img => {
+      if (img.dataset.instasaverInjected === 'true') return;
+
+      // Filtros estritos: se a imagem for pequena ou avatar, descarta
+      const rect = img.getBoundingClientRect();
+      if (rect.width < 280 || rect.height < 280) return;
+      if (img.src.includes('s150x150') || img.src.includes('profile_pic')) return;
+
+      // Se houver um vídeo no mesmo post/container, NÃO insere botão de foto
+      const postArticle = img.closest('article') || img.parentElement;
+      if (postArticle && postArticle.querySelector('video')) {
+        img.dataset.instasaverInjected = 'true';
+        return;
+      }
+
+      let container = img.parentElement;
+      if (!container || container.querySelector('.instasaver-float-btn')) {
+        img.dataset.instasaverInjected = 'true';
+        return;
+      }
+
+      container.classList.add('instasaver-media-wrapper');
+
+      const btn = document.createElement('button');
+      btn.className = 'instasaver-float-btn';
+      btn.dataset.type = 'image';
+      btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Foto (HD)</span>`;
+      btn.title = 'Clique para baixar esta imagem em alta resolução';
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        btn.classList.add('downloading');
+        btn.innerHTML = `${CHECK_SVG}<span>Baixando...</span>`;
+
+        const filename = `insta_foto_${Date.now()}.jpg`;
+        showToast('Baixando foto selecionada...');
+
+        chrome.runtime.sendMessage({
+          action: 'DOWNLOAD_MEDIA',
+          url: img.src,
+          filename: filename
+        }, (res) => {
+          if (res && res.success) {
+            btn.innerHTML = `${CHECK_SVG}<span>✓ Salva!</span>`;
+            setTimeout(() => {
+              btn.classList.remove('downloading');
+              btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Foto (HD)</span>`;
+            }, 3000);
+          } else {
+            showToast('Erro ao baixar a imagem.', false);
+            btn.classList.remove('downloading');
+            btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Foto (HD)</span>`;
+          }
+        });
+      });
+
+      container.appendChild(btn);
+      img.dataset.instasaverInjected = 'true';
+    });
+  }
+
+  // ==========================================
+  // 3. INJEÇÃO EM STORIES E DESTAQUES
+  // ==========================================
   function injectStoriesButton() {
     const isStories = window.location.pathname.startsWith('/stories/');
     if (!isStories) return;
 
-    // Procura o cabeçalho superior do Story onde ficam os botões de pause/áudio/fechar
-    const storyHeader = document.querySelector('section header, div[role="dialog"] header, section div[class*="_ab3"]');
-    if (!storyHeader) return;
-
-    if (storyHeader.querySelector('.instasaver-btn-story')) return; // já injetado
-
-    const downloadBtn = document.createElement('button');
-    downloadBtn.className = 'instasaver-btn-story';
     const isHighlight = window.location.pathname.includes('/highlights/');
-    downloadBtn.innerHTML = `${DOWNLOAD_ICON_SVG} <span>Baixar ${isHighlight ? 'Destaque' : 'Story'}</span>`;
-    downloadBtn.title = 'Baixar este Story/Destaque agora com qualidade original';
 
-    downloadBtn.addEventListener('click', async (e) => {
+    // Procura o cabeçalho superior ou diálogo do Story
+    const storyContainer = document.querySelector('section:has(video), section:has(img[decoding="sync"]), div[role="dialog"]:has(video)');
+    if (!storyContainer) return;
+
+    if (document.querySelector('.instasaver-story-btn')) return; // já existe
+
+    const btn = document.createElement('button');
+    btn.className = 'instasaver-story-btn';
+    btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar ${isHighlight ? 'Destaque' : 'Story'}</span>`;
+    btn.title = 'Baixar exatamente a mídia que está sendo exibida agora';
+
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       e.preventDefault();
 
-      // Pausa o story momentaneamente se puder
-      const videoEl = document.querySelector('section video, div[role="dialog"] video');
-      const imgEl = document.querySelector('section img[decoding="sync"], section img[style*="object-fit"], div[role="dialog"] img');
+      const activeVideo = document.querySelector('section video, div[role="dialog"] video');
+      const activeImg = document.querySelector('section img[decoding="sync"], div[role="dialog"] img[style*="object-fit"]');
 
-      let mediaUrl = null;
+      let url = null;
       let isVideo = false;
 
-      if (videoEl) {
+      if (activeVideo) {
         isVideo = true;
-        mediaUrl = await resolveMediaUrl(videoEl, true);
-      } else if (imgEl) {
+        url = await getCleanVideoUrl(activeVideo);
+      } else if (activeImg) {
         isVideo = false;
-        mediaUrl = imgEl.src;
+        url = activeImg.src;
       }
 
-      if (!mediaUrl) {
-        showToast('Não foi possível capturar a mídia deste story.', false);
+      if (!url) {
+        showToast('Não foi possível identificar a mídia deste story.', false);
         return;
       }
 
-      // Extrai usuário da URL ou do cabeçalho
-      const pathParts = window.location.pathname.split('/').filter(Boolean);
-      let username = 'destaque';
-      if (pathParts.length >= 2 && pathParts[0] === 'stories' && pathParts[1] !== 'highlights') {
-        username = pathParts[1];
-      }
-
       const ext = isVideo ? 'mp4' : 'jpg';
-      const filename = `insta_${isHighlight ? 'destaque' : 'story'}_${username}_${Date.now()}.${ext}`;
+      const filename = `insta_${isHighlight ? 'destaque' : 'story'}_${Date.now()}.${ext}`;
 
-      showToast(`Iniciando download do ${isHighlight ? 'Destaque' : 'Story'} de @${username}...`);
+      showToast(`Baixando ${isHighlight ? 'destaque' : 'story'} (${ext.toUpperCase()})...`);
 
       chrome.runtime.sendMessage({
         action: 'DOWNLOAD_MEDIA',
-        url: mediaUrl,
+        url: url,
         filename: filename
-      }, (res) => {
-        if (res && res.success) {
-          showToast(`✓ Salvo: ${filename}`, true);
-        } else {
-          showToast('Erro ao salvar o arquivo.', false);
-        }
       });
     });
 
-    // Insere no início do bloco de controles do cabeçalho
-    const controlsContainer = storyHeader.querySelector('div:last-child') || storyHeader;
-    controlsContainer.prepend(downloadBtn);
+    storyContainer.appendChild(btn);
   }
 
-  // 2. Injeção no Feed e Posts Modais
-  function injectFeedButtons() {
-    const articles = document.querySelectorAll('article:not(.instasaver-processed), div[role="dialog"] article:not(.instasaver-processed)');
-
-    articles.forEach(article => {
-      article.classList.add('instasaver-processed');
-
-      // Procura a barra de ações (Like, Comentar, Compartilhar, Salvar)
-      // O botão de salvar (Bookmark) geralmente fica no lado direito da barra de botões
-      const buttonsBar = article.querySelector('section:has(svg)');
-      if (!buttonsBar) return;
-
-      if (buttonsBar.querySelector('.instasaver-btn-feed')) return;
-
-      const downloadBtn = document.createElement('button');
-      downloadBtn.className = 'instasaver-btn-feed';
-      downloadBtn.setAttribute('aria-label', 'Baixar Conteúdo');
-      downloadBtn.title = 'Baixar Vídeo/Foto deste Post';
-      downloadBtn.innerHTML = DOWNLOAD_ICON_SVG;
-
-      downloadBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        // Localiza a mídia deste post específico
-        const videoEl = article.querySelector('video');
-        const imgEl = article.querySelector('div[role="button"] img, img[style*="object-fit"]');
-
-        let isVideo = Boolean(videoEl);
-        let mediaUrl = null;
-
-        if (isVideo) {
-          mediaUrl = await resolveMediaUrl(videoEl, true);
-        } else if (imgEl) {
-          mediaUrl = imgEl.src;
-        }
-
-        if (!mediaUrl) {
-          showToast('Mídia não encontrada neste post.', false);
-          return;
-        }
-
-        // Tenta achar código do post ou autor
-        const postLink = article.querySelector('a[href*="/p/"], a[href*="/reel/"]');
-        let code = 'post';
-        if (postLink) {
-          const match = postLink.href.match(/\/(p|reel)\/([^/]+)/);
-          if (match && match[2]) code = match[2];
-        }
-
-        const ext = isVideo ? 'mp4' : 'jpg';
-        const filename = `insta_${code}_${Date.now()}.${ext}`;
-
-        showToast(`Baixando ${isVideo ? 'vídeo' : 'foto'} (${ext.toUpperCase()})...`);
-
-        chrome.runtime.sendMessage({
-          action: 'DOWNLOAD_MEDIA',
-          url: mediaUrl,
-          filename: filename
-        }, (res) => {
-          if (res && res.success) {
-            showToast(`✓ Salvo com sucesso!`, true);
-          } else {
-            showToast('Erro ao baixar mídia.', false);
-          }
-        });
-      });
-
-      // Adiciona ao lado do botão de salvar ou ao final da seção
-      const saveBtn = buttonsBar.querySelector('div:last-child');
-      if (saveBtn) {
-        saveBtn.appendChild(downloadBtn);
-      } else {
-        buttonsBar.appendChild(downloadBtn);
-      }
-    });
-  }
-
-  // 3. Injeção na página de Reels (/reels/ ou /reel/)
-  function injectReelsButton() {
-    if (!window.location.pathname.includes('/reel')) return;
-
-    // Procura os blocos de ação lateral nos Reels
-    const reelActions = document.querySelectorAll('div[role="button"]:has(svg[aria-label*="Curtir"]), div:has(svg[aria-label*="Like"])');
-    reelActions.forEach(actionBlock => {
-      const parentCol = actionBlock.parentElement;
-      if (parentCol && !parentCol.querySelector('.instasaver-btn-reel')) {
-        const btn = document.createElement('button');
-        btn.className = 'instasaver-btn-reel';
-        btn.innerHTML = `${DOWNLOAD_ICON_SVG}<span>Baixar</span>`;
-        btn.title = 'Baixar Reel em MP4';
-
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const videoEl = document.querySelector('video');
-          if (videoEl) {
-            const mediaUrl = await resolveMediaUrl(videoEl, true);
-            if (mediaUrl) {
-              const code = window.location.pathname.split('/').filter(Boolean)[1] || 'reel';
-              showToast('Baixando Reel...');
-              chrome.runtime.sendMessage({
-                action: 'DOWNLOAD_MEDIA',
-                url: mediaUrl,
-                filename: `insta_reel_${code}_${Date.now()}.mp4`
-              });
-            }
-          }
-        });
-
-        parentCol.appendChild(btn);
-      }
-    });
-  }
-
-  // Observer contínuo para páginas dinâmicas (Single Page Application)
-  let scanScheduled = false;
-  function scheduleScan() {
-    if (scanScheduled) return;
-    scanScheduled = true;
+  // Loop de escaneamento suave
+  let isScanning = false;
+  function runScan() {
+    if (isScanning) return;
+    isScanning = true;
     requestAnimationFrame(() => {
+      injectButtonsOnVideos();
+      injectButtonsOnPhotos();
       injectStoriesButton();
-      injectFeedButtons();
-      injectReelsButton();
-      scanScheduled = false;
+      isScanning = false;
     });
   }
 
-  const observer = new MutationObserver(scheduleScan);
+  const observer = new MutationObserver(runScan);
   observer.observe(document.body || document.documentElement, {
     childList: true,
     subtree: true
   });
 
-  // Execução inicial
-  scheduleScan();
+  runScan();
 
-  // Escuta requisições do Popup da Extensão
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'GET_PAGE_MEDIA') {
-      const isStories = window.location.pathname.startsWith('/stories/');
-      const isReel = window.location.pathname.includes('/reel');
-      const isPost = window.location.pathname.startsWith('/p/');
-      const isHighlight = isStories && window.location.pathname.includes('/highlights/');
+  // Escuta requisição do Popup: devolve APENAS o vídeo atualmente em foco/reprodução
+  chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+    if (req.action === 'GET_FOCUSED_MEDIA') {
+      const videos = Array.from(document.querySelectorAll('video'));
+      let focusedVideo = null;
 
-      let pageType = 'feed';
-      if (isHighlight) pageType = 'highlight';
-      else if (isStories) pageType = 'stories';
-      else if (isReel) pageType = 'reel';
-      else if (isPost) pageType = 'post';
+      // 1. Procura vídeo que esteja tocando no momento
+      focusedVideo = videos.find(v => !v.paused && v.currentTime > 0);
 
-      // Coleta mídias visíveis
-      const mediaList = [];
-      const seenUrls = new Set();
+      // 2. Se nenhum estiver tocando, pega o vídeo mais centralizado na tela do usuário
+      if (!focusedVideo && videos.length > 0) {
+        const center = window.innerHeight / 2;
+        let closestDist = Infinity;
 
-      // Vídeos
-      document.querySelectorAll('video').forEach((vid, idx) => {
-        let src = vid.src || vid.currentSrc;
-        if (src && !seenUrls.has(src)) {
-          seenUrls.add(src);
-          mediaList.push({
+        videos.forEach(v => {
+          const rect = v.getBoundingClientRect();
+          // Ignora se estiver fora da tela
+          if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+          const vCenter = rect.top + rect.height / 2;
+          const dist = Math.abs(vCenter - center);
+          if (dist < closestDist) {
+            closestDist = dist;
+            focusedVideo = v;
+          }
+        });
+      }
+
+      if (focusedVideo) {
+        getCleanVideoUrl(focusedVideo).then(url => {
+          sendResponse({
+            success: true,
+            hasMedia: Boolean(url),
             type: 'video',
-            url: src,
-            title: `Vídeo ${idx + 1} (${pageType.toUpperCase()})`,
-            pageType: pageType
+            url: url,
+            isStory: window.location.pathname.startsWith('/stories/')
           });
-        }
-      });
+        });
+        return true;
+      }
 
-      // Imagens de post
-      document.querySelectorAll('article img[style*="object-fit"], div[role="dialog"] img, section img[decoding="sync"]').forEach((img, idx) => {
-        if (img.src && !img.src.includes('profile_pic') && !seenUrls.has(img.src)) {
-          seenUrls.add(img.src);
-          mediaList.push({
-            type: 'image',
-            url: img.src,
-            title: `Foto ${idx + 1}`,
-            pageType: pageType
-          });
-        }
-      });
-
-      sendResponse({
-        success: true,
-        pageType: pageType,
-        url: window.location.href,
-        items: mediaList
-      });
+      sendResponse({ success: true, hasMedia: false });
       return true;
     }
   });

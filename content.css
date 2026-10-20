@@ -1,162 +1,141 @@
-/* InstaSaver Pro - In-Page UI Styling */
+/* InstaSaver Pro - Estilos de Botão na Tela e Hover */
 
-/* Botão de download nos Posts e Feed */
-.instasaver-btn-feed {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  margin-left: 6px;
-  color: inherit;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s;
-  border-radius: 50%;
-  position: relative;
+/* Container relativo para que o botão flutue exatamente sobre a mídia */
+.instasaver-media-wrapper {
+  position: relative !important;
 }
 
-.instasaver-btn-feed:hover {
-  transform: scale(1.15);
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.instasaver-btn-feed:active {
-  transform: scale(0.95);
-}
-
-.instasaver-btn-feed svg {
-  width: 24px;
-  height: 24px;
-  fill: currentColor;
-}
-
-/* Botão de download nos Stories e Destaques */
-.instasaver-btn-story {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 20px;
-  color: #ffffff;
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-right: 10px;
-  transition: all 0.25s ease;
-  z-index: 99999;
-}
-
-.instasaver-btn-story:hover {
-  background: linear-gradient(45deg, #fcb045, #fd1d1d, #833ab4);
-  border-color: transparent;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(253, 29, 29, 0.4);
-}
-
-.instasaver-btn-story svg {
-  width: 16px;
-  height: 16px;
-  fill: #ffffff;
-}
-
-/* Botão nos Reels */
-.instasaver-btn-reel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: #ffffff;
-  cursor: pointer;
-  padding: 8px 0;
-  transition: transform 0.2s;
-}
-
-.instasaver-btn-reel:hover {
-  transform: scale(1.12);
-}
-
-.instasaver-btn-reel svg {
-  width: 28px;
-  height: 28px;
-  fill: #ffffff;
-}
-
-.instasaver-btn-reel span {
-  font-size: 11px;
-  font-weight: 500;
-  margin-top: 4px;
-  color: #ffffff;
-}
-
-/* Overlay rápido de download sobre o vídeo/foto */
-.instasaver-hover-btn {
+/* Botão Flutuante Elegante sobre Vídeos e Fotos */
+.instasaver-float-btn {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(6px);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 6px 12px;
-  border-radius: 18px;
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
+  top: 14px;
+  right: 14px;
+  z-index: 99999;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  background: rgba(18, 18, 24, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 22px;
+  padding: 8px 15px;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0;
-  transition: opacity 0.25s, transform 0.25s;
-  z-index: 1000;
-  pointer-events: auto;
+  pointer-events: none;
+  transform: translateY(-4px);
+  user-select: none;
 }
 
-article:hover .instasaver-hover-btn,
-div[role="dialog"]:hover .instasaver-hover-btn {
-  opacity: 1;
+/* Exibe o botão suavemente ao passar o mouse sobre o post ou sobre o vídeo */
+article:hover .instasaver-float-btn,
+div[role="dialog"]:hover .instasaver-float-btn,
+div[role="button"]:hover .instasaver-float-btn,
+.instasaver-media-wrapper:hover .instasaver-float-btn,
+section:hover .instasaver-float-btn {
+  opacity: 0.95;
+  pointer-events: auto;
   transform: translateY(0);
 }
 
-.instasaver-hover-btn:hover {
+/* Efeito ao passar o mouse diretamente no botão */
+.instasaver-float-btn:hover {
+  opacity: 1 !important;
+  background: linear-gradient(135deg, #fd1d1d 0%, #833ab4 100%);
+  border-color: transparent;
+  transform: scale(1.06) translateY(0);
+  box-shadow: 0 6px 22px rgba(253, 29, 29, 0.45);
+}
+
+.instasaver-float-btn:active {
+  transform: scale(0.96);
+}
+
+/* Ícone dentro do botão */
+.instasaver-float-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+/* Estado de Sucesso / Baixando */
+.instasaver-float-btn.downloading {
+  background: #16a34a !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  pointer-events: none;
+}
+
+/* Botão fixo nos Stories e Destaques */
+.instasaver-story-btn {
+  position: absolute;
+  top: 16px;
+  right: 90px; /* ao lado dos botões nativos de pause e som */
+  z-index: 2147483640;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 6px 14px;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  transition: all 0.25s ease;
+}
+
+.instasaver-story-btn:hover {
   background: linear-gradient(135deg, #fd1d1d, #833ab4);
   border-color: transparent;
+  transform: scale(1.05);
 }
 
-.instasaver-hover-btn svg {
+.instasaver-story-btn svg {
   width: 14px;
   height: 14px;
-  fill: #fff;
+  stroke: currentColor;
+  stroke-width: 2.2;
 }
 
-/* Notificação Toast na Página */
+/* Toast de Notificação Discreta */
 .instasaver-toast {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: rgba(18, 18, 22, 0.95);
+  background: rgba(18, 18, 24, 0.96);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-left: 4px solid #fd1d1d;
   padding: 12px 20px;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.2);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   z-index: 2147483647;
   transform: translateY(20px);
   opacity: 0;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
 
@@ -165,8 +144,6 @@ div[role="dialog"]:hover .instasaver-hover-btn {
   opacity: 1;
 }
 
-.instasaver-toast-icon {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
+.instasaver-toast.success {
+  border-left-color: #22c55e;
 }
