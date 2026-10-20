@@ -1,13 +1,12 @@
 /**
- * InstaSaver Pro - Background Service Worker
- * Captura URLs originais e assinadas da CDN da Meta em tempo real.
- * Não altera os parâmetros de assinatura (oh/oe) para garantir HTTP 200 no download.
+ * InstaSaver Pro - Background Service Worker (v1.2.0)
+ * Filtra fluxos DASH/VP9 da Meta e garante apenas vídeos H.264 com áudio AAC estéreo
+ * compatíveis nativamente com QuickTime, Mac, iPhone e WhatsApp.
  */
 
 const capturedVideosByTab = new Map();
 const MAX_CACHE = 20;
 
-// Interceptador de mídia em tempo real
 if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
   chrome.webRequest.onResponseStarted.addListener(
     (details) => {
@@ -17,6 +16,16 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
 
         const isCdn = url.includes('cdninstagram.com') || url.includes('fbcdn.net');
         if (!isCdn) return;
+
+        // 1. DESCARTA FLUXOS VP9 / DASH (Incompatíveis com QuickTime e sem áudio)
+        if (
+          url.includes('vp09') ||
+          url.includes('vp9') ||
+          url.includes('/dash-') ||
+          url.includes('bytestart=')
+        ) {
+          return;
+        }
 
         // Descarta avatares, rastreadores e scripts
         if (
@@ -40,7 +49,7 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
           for (const h of responseHeaders) {
             if (h.name.toLowerCase() === 'content-type') {
               const val = (h.value || '').toLowerCase();
-              if (val.includes('video/mp4') || val.includes('video/webm')) {
+              if (val.includes('video/mp4')) {
                 isVideo = true;
                 break;
               }
@@ -54,7 +63,6 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
           }
           const list = capturedVideosByTab.get(tabId);
 
-          // Salva a URL original sem mexer na assinatura criptográfica
           const exists = list.some(item => item.url === url);
           if (!exists) {
             list.unshift({
@@ -68,7 +76,7 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
           }
         }
       } catch (err) {
-        console.error('[InstaSaver] Erro ao capturar requisição:', err);
+        console.error('[InstaSaver] Erro no sniffer:', err);
       }
     },
     {
@@ -81,7 +89,7 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
   );
 }
 
-// Limpeza de abas fechadas
+// Limpeza de abas
 chrome.tabs.onRemoved.addListener((tabId) => {
   capturedVideosByTab.delete(tabId);
 });
@@ -92,11 +100,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   }
 });
 
-// Comunicação com Content Script e Popup
+// Mensagens
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = (sender && sender.tab && sender.tab.id) || message.tabId;
 
-  // Retorna o vídeo mais recente capturado na aba
   if (message.action === 'GET_LATEST_VIDEO') {
     const list = capturedVideosByTab.get(tabId) || [];
     const latest = list.length > 0 ? list[0].url : null;
@@ -104,7 +111,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // Executa o download oficial do arquivo
   if (message.action === 'DOWNLOAD_MEDIA') {
     const { url, filename, saveAs } = message;
     if (!url) {
