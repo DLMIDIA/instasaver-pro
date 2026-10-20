@@ -14,6 +14,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const directLinkInput = document.getElementById('directLinkInput');
   const goLinkBtn = document.getElementById('goLinkBtn');
+  const appVersionText = document.getElementById('appVersionText');
+
+  // Exibe a versão dinâmica do manifest
+  if (appVersionText) {
+    const manifest = chrome.runtime.getManifest();
+    appVersionText.textContent = `InstaSaver Pro v${manifest.version} • 100% Grátis & Sem Anúncios`;
+  }
 
   let activeMediaUrl = null;
 
