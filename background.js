@@ -1,11 +1,10 @@
 /**
- * InstaSaver Pro - Background Service Worker (v1.2.0)
- * Filtra fluxos DASH/VP9 da Meta e garante apenas vídeos H.264 com áudio AAC estéreo
- * compatíveis nativamente com QuickTime, Mac, iPhone e WhatsApp.
+ * InstaSaver Pro - Background Service Worker (v1.3.0)
+ * Gerencia downloads e captura requisições de mídia em tempo real.
  */
 
 const capturedVideosByTab = new Map();
-const MAX_CACHE = 20;
+const MAX_CACHE = 25;
 
 if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
   chrome.webRequest.onResponseStarted.addListener(
@@ -16,16 +15,6 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
 
         const isCdn = url.includes('cdninstagram.com') || url.includes('fbcdn.net');
         if (!isCdn) return;
-
-        // 1. DESCARTA FLUXOS VP9 / DASH (Incompatíveis com QuickTime e sem áudio)
-        if (
-          url.includes('vp09') ||
-          url.includes('vp9') ||
-          url.includes('/dash-') ||
-          url.includes('bytestart=')
-        ) {
-          return;
-        }
 
         // Descarta avatares, rastreadores e scripts
         if (
@@ -40,7 +29,6 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
 
         let isVideo = false;
 
-        // Na Meta, 't50' identifica fluxos de VÍDEO
         if (url.includes('/t50.') || url.includes('/v/t50.') || url.includes('.mp4')) {
           isVideo = true;
         }
@@ -49,7 +37,7 @@ if (chrome.webRequest && chrome.webRequest.onResponseStarted) {
           for (const h of responseHeaders) {
             if (h.name.toLowerCase() === 'content-type') {
               const val = (h.value || '').toLowerCase();
-              if (val.includes('video/mp4')) {
+              if (val.includes('video/mp4') || val.includes('video/webm')) {
                 isVideo = true;
                 break;
               }

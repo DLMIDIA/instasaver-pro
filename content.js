@@ -1,11 +1,13 @@
 /**
- * InstaSaver Pro - Content Script (v1.2.0)
- * Extrai vídeos H.264 (AVC) com áudio AAC estéreo integrado através da API oficial do Web App da Meta.
- * Garante compatibilidade 100% nativa com o QuickTime Player do macOS, iPhone e WhatsApp.
+ * InstaSaver Pro - Content Script (v1.3.0)
+ * Injeta botões com prioridade máxima e consulta o script inject.js (mundo MAIN)
+ * para obter o arquivo MP4 em H.264 com áudio direto do React Fiber da Meta.
  */
 
 (function () {
   'use strict';
+
+  let videoCounter = 0;
 
   const DOWNLOAD_SVG = `
     <svg viewBox="0 0 24 24">
@@ -21,7 +23,6 @@
     </svg>
   `;
 
-  // Toast
   function showToast(message, isSuccess = true) {
     let toast = document.getElementById('instasaver-toast-elem');
     if (!toast) {
@@ -43,53 +44,35 @@
     }, 3800);
   }
 
-  // 1. Busca a versão H.264 (AVC) com áudio AAC através da API interna do Instagram
-  async function fetchH264VideoUrl(postCode) {
-    if (!postCode) return null;
+  // Consulta o script no mundo MAIN para ler o React Fiber
+  function queryMainWorldVideoUrl(videoId, postCode) {
+    return new Promise((resolve) => {
+      let resolved = false;
 
-    try {
-      // Endpoint oficial da API Web da Meta (retorna video_versions com áudio multiplexado)
-      const resp = await fetch(`https://www.instagram.com/p/${postCode}/?__a=1&__d=dis`, {
-        headers: {
-          'X-IG-App-ID': '936619743392459',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        credentials: 'include'
-      });
-
-      if (resp.ok) {
-        const json = await resp.json();
-        const item = json.items?.[0] || json.graphql?.shortcode_media;
-        if (item && item.video_versions && item.video_versions.length > 0) {
-          // video_versions[0] é o MP4 H.264 de alta resolução com som estéreo AAC
-          return item.video_versions[0].url;
+      const handler = (e) => {
+        if (e.detail && e.detail.videoId === videoId) {
+          window.removeEventListener('instasaver_video_response', handler);
+          resolved = true;
+          resolve(e.detail.url || null);
         }
-      }
-    } catch (e) {
-      console.warn('[InstaSaver] Falha na consulta por endpoint:', e);
-    }
+      };
 
-    // 2. Extrai de scripts embutidos na própria página
-    try {
-      const scripts = document.querySelectorAll('script');
-      for (const s of scripts) {
-        const txt = s.textContent;
-        if (txt && txt.includes('video_versions')) {
-          const match = txt.match(/"video_versions":\s*(\[\{.*?\}\])/);
-          if (match && match[1]) {
-            const list = JSON.parse(match[1]);
-            if (Array.isArray(list) && list[0] && list[0].url) {
-              return list[0].url.replace(/\\u0026/g, '&').replace(/\\\//g, '/');
-            }
-          }
+      window.addEventListener('instasaver_video_response', handler);
+
+      window.dispatchEvent(new CustomEvent('instasaver_query_video', {
+        detail: { videoId, postCode }
+      }));
+
+      // Timeout de segurança de 300ms
+      setTimeout(() => {
+        if (!resolved) {
+          window.removeEventListener('instasaver_video_response', handler);
+          resolve(null);
         }
-      }
-    } catch (e) {}
-
-    return null;
+      }, 300);
+    });
   }
 
-  // Disparo do download oficial
   function triggerDownload(url, filename, btn) {
     chrome.runtime.sendMessage({
       action: 'DOWNLOAD_MEDIA',
@@ -98,7 +81,7 @@
     }, (res) => {
       if (res && res.success) {
         btn.innerHTML = `${CHECK_SVG}<span>✓ Baixado!</span>`;
-        showToast('✓ Vídeo salvo (H.264 + Áudio AAC)!', true);
+        showToast('✓ Download iniciado com sucesso!', true);
         setTimeout(() => {
           btn.classList.remove('downloading');
           btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
@@ -112,13 +95,16 @@
   }
 
   // ===============================================
-  // INJEÇÃO NOS VÍDEOS (Feed, Reels e Posts)
+  // INJEÇÃO NOS VÍDEOS
   // ===============================================
   function injectButtonsOnVideos() {
     const videos = document.querySelectorAll('video');
 
     videos.forEach(video => {
       if (video.dataset.instasaverInjected === 'true') return;
+
+      const vidId = 'is_vid_' + (++videoCounter);
+      video.dataset.instasaverId = vidId;
 
       let container = video.parentElement;
       while (container && container.tagName !== 'ARTICLE' && container.tagName !== 'BODY') {
@@ -143,7 +129,7 @@
       btn.className = 'instasaver-float-btn';
       btn.type = 'button';
       btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
-      btn.title = 'Baixar vídeo compatível com QuickTime e WhatsApp (H.264 + Áudio)';
+      btn.title = 'Baixar vídeo completo em MP4 com áudio';
 
       const handleDownloadClick = async (e) => {
         e.stopPropagation();
@@ -154,7 +140,7 @@
 
         btn.classList.add('downloading');
         btn.innerHTML = `${CHECK_SVG}<span>Baixando...</span>`;
-        showToast('Obtendo vídeo em H.264 com áudio...');
+        showToast('Localizando arquivo de vídeo...');
 
         // Identifica o código do post
         let code = null;
@@ -163,26 +149,23 @@
         if (postLink) {
           const match = postLink.href.match(/\/(p|reel)\/([^/]+)/);
           if (match && match[2]) code = match[2];
-        } else if (window.location.pathname.includes('/reel/')) {
+        } else if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
           const parts = window.location.pathname.split('/').filter(Boolean);
           if (parts[1]) code = parts[1];
         }
 
         const filename = `insta_${code || 'video'}_${Date.now()}.mp4`;
 
-        // 1. Tenta obter o MP4 progressivo em H.264 + AAC
-        let finalUrl = null;
-        if (code) {
-          finalUrl = await fetchH264VideoUrl(code);
-        }
+        // 1. Tenta pegar a URL H.264 diretamente do React Fiber / Cache da página
+        let finalUrl = await queryMainWorldVideoUrl(vidId, code);
 
-        // 2. Se não achou por código, tenta o OpenGraph da página
+        // 2. Se não achou no Fiber, tenta OpenGraph
         if (!finalUrl) {
           const og = document.querySelector('meta[property="og:video"]');
           if (og && og.content) finalUrl = og.content;
         }
 
-        // 3. Fallback: consulta fluxo H.264 no background
+        // 3. Se não achou, consulta as URLs capturadas pelo Background Service Worker
         if (!finalUrl) {
           const bgRes = await new Promise(resolve => {
             chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, resolve);
@@ -190,16 +173,21 @@
           if (bgRes && bgRes.url) finalUrl = bgRes.url;
         }
 
+        // 4. Último recurso: URL direta do elemento
+        if (!finalUrl && video.src && video.src.startsWith('http') && !video.src.startsWith('blob:')) {
+          finalUrl = video.src;
+        }
+
         if (finalUrl) {
           triggerDownload(finalUrl, filename, btn);
         } else {
-          showToast('Não foi possível capturar o stream de vídeo.', false);
+          showToast('Dê play no vídeo por 1 segundo e clique novamente.', false);
           btn.classList.remove('downloading');
           btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
         }
       };
 
-      // Fase de Captura (true) para prioridade absoluta contra overlays
+      // Prioridade máxima de captura
       btn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.stopImmediatePropagation(); }, true);
       btn.addEventListener('mousedown', (e) => { e.stopPropagation(); e.stopImmediatePropagation(); }, true);
       btn.addEventListener('click', handleDownloadClick, true);
@@ -228,23 +216,34 @@
     btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar ${isHighlight ? 'Destaque' : 'Story'}</span>`;
     btn.title = 'Baixar a mídia em exibição agora';
 
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       e.stopImmediatePropagation();
       e.preventDefault();
 
+      const activeVideo = document.querySelector('section video, div[role="dialog"] video');
       const activeImg = document.querySelector('section img[decoding="sync"], div[role="dialog"] img[style*="object-fit"]');
       const filename = `insta_${isHighlight ? 'destaque' : 'story'}_${Date.now()}`;
 
-      chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, (res) => {
-        if (res && res.url) {
-          triggerDownload(res.url, `${filename}.mp4`, btn);
-        } else if (activeImg && activeImg.src) {
-          triggerDownload(activeImg.src, `${filename}.jpg`, btn);
-        } else {
-          showToast('Mídia não encontrada neste Story.', false);
-        }
-      });
+      let url = null;
+      if (activeVideo) {
+        url = await queryMainWorldVideoUrl(activeVideo.dataset.instasaverId, null);
+      }
+
+      if (!url) {
+        const bgRes = await new Promise(resolve => {
+          chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, resolve);
+        });
+        if (bgRes && bgRes.url) url = bgRes.url;
+      }
+
+      if (url) {
+        triggerDownload(url, `${filename}.mp4`, btn);
+      } else if (activeImg && activeImg.src) {
+        triggerDownload(activeImg.src, `${filename}.jpg`, btn);
+      } else {
+        showToast('Mídia não encontrada neste Story.', false);
+      }
     }, true);
 
     btn.addEventListener('pointerdown', (e) => { e.stopPropagation(); }, true);
@@ -253,7 +252,7 @@
     storyContainer.appendChild(btn);
   }
 
-  // Observer de DOM
+  // Observer
   let scanScheduled = false;
   function scheduleScan() {
     if (scanScheduled) return;

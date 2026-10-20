@@ -8,7 +8,7 @@
   <p><strong>A Extensão Definitiva para Baixar Vídeos, Reels, Stories, Destaques e Fotos do Instagram com 1 Clique.</strong></p>
 
   <p>
-    <a href="#-instalação-rápida-30-segundos"><img src="https://img.shields.io/badge/Versão-1.2.0-blue?style=for-the-badge" alt="Version 1.2.0" /></a>
+    <a href="#-instalação-rápida-30-segundos"><img src="https://img.shields.io/badge/Versão-1.3.0-blue?style=for-the-badge" alt="Version 1.3.0" /></a>
     <a href="#-instalação-rápida-30-segundos"><img src="https://img.shields.io/badge/Chrome_Extension-Manifest_V3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Manifest V3" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/Licen%C3%A7a-MIT-22c55e?style=for-the-badge" alt="License MIT" /></a>
     <img src="https://img.shields.io/badge/100%25-Gratuito-833ab4?style=for-the-badge" alt="Gratuito" />
