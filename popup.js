@@ -1,5 +1,5 @@
 /**
- * InstaSaver Pro - Popup Controller (v2.0.0)
+ * InstaSaver Pro - Popup Controller (v2.1.0)
  */
 
 document.addEventListener('DOMContentLoaded', async () => {

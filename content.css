@@ -1,83 +1,167 @@
-/* InstaSaver Pro v2.0 - Content Styles */
+/* InstaSaver Pro v2.1.0 - Content Styles */
 
-.instasaver-media-wrapper {
-  position: relative !important;
-}
-
-/* 1. Botão Flutuante em Vídeos (Feed, Reels e Modal) */
-.instasaver-float-btn {
-  position: absolute !important;
-  top: 14px !important;
-  right: 14px !important;
-  z-index: 2147483647 !important;
-  pointer-events: auto !important;
+/* ==============================================================
+   1. BOTÃO NA BARRA DE AÇÕES DO POST (Feed, Modal e /p/)
+   Posicionado ao lado do botão de Salvar/Bookmark (FORA DO VÍDEO)
+   ============================================================== */
+.instasaver-action-btn {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
-  background: rgba(18, 18, 24, 0.92) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.28) !important;
-  border-radius: 24px !important;
-  padding: 8px 16px !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  margin: 0 4px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 18px !important;
   color: #ffffff !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
   font-size: 13px !important;
   font-weight: 600 !important;
+  letter-spacing: -0.1px !important;
   cursor: pointer !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55) !important;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
   user-select: none !important;
+  vertical-align: middle !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  pointer-events: auto !important;
+  z-index: 10 !important;
   line-height: 1 !important;
-  opacity: 0.88;
 }
 
-article:hover .instasaver-float-btn,
-div[role="dialog"]:hover .instasaver-float-btn,
-div[role="button"]:hover .instasaver-float-btn,
-.instasaver-media-wrapper:hover .instasaver-float-btn,
-section:hover .instasaver-float-btn,
-.instasaver-float-btn:hover {
-  opacity: 1 !important;
+/* Suporte automático a tema claro do Instagram */
+body:not([class*="dark"]):not([style*="background-color: rgb(0"]):not([style*="background-color: #0"]) .instasaver-action-btn {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: #262626 !important;
 }
 
-.instasaver-float-btn:hover {
+.instasaver-action-btn:hover {
   background: linear-gradient(135deg, #fd1d1d 0%, #833ab4 100%) !important;
   border-color: transparent !important;
-  transform: scale(1.05) !important;
-  box-shadow: 0 6px 24px rgba(253, 29, 29, 0.5) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) scale(1.04) !important;
+  box-shadow: 0 4px 16px rgba(253, 29, 29, 0.4) !important;
 }
 
-.instasaver-float-btn:active {
+.instasaver-action-btn:active {
   transform: scale(0.96) !important;
 }
 
-.instasaver-float-btn svg {
-  width: 15px !important;
-  height: 15px !important;
+.instasaver-action-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+}
+
+.instasaver-action-icon svg {
+  width: 17px !important;
+  height: 17px !important;
   stroke: currentColor !important;
   stroke-width: 2.2 !important;
   flex-shrink: 0 !important;
   pointer-events: none !important;
 }
 
-.instasaver-float-btn span {
+.instasaver-action-label {
   pointer-events: none !important;
+  font-weight: 600 !important;
 }
 
-.instasaver-float-btn.downloading {
+.instasaver-action-btn.downloading {
   background: #16a34a !important;
   border-color: #22c55e !important;
   color: #ffffff !important;
 }
 
-/* 2. Botão nos Stories e Destaques */
-.instasaver-story-btn {
-  position: absolute !important;
-  top: 18px !important;
-  right: 90px !important;
-  z-index: 2147483647 !important;
+.instasaver-action-btn.downloaded {
+  background: #22c55e !important;
+  border-color: #22c55e !important;
+  color: #ffffff !important;
+}
+
+/* ==============================================================
+   2. BOTÃO NA BARRA LATERAL DOS REELS (Vertical)
+   Empilhado com Curtir, Comentar e Compartilhar
+   ============================================================== */
+.instasaver-reels-btn-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 12px 0 !important;
   pointer-events: auto !important;
+  user-select: none !important;
+  z-index: 10 !important;
+}
+
+.instasaver-reels-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  color: #ffffff !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+.instasaver-reels-icon {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(20, 20, 26, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.instasaver-reels-icon svg {
+  width: 22px !important;
+  height: 22px !important;
+  stroke: currentColor !important;
+  stroke-width: 2.2 !important;
+}
+
+.instasaver-reels-label {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
+  letter-spacing: -0.1px !important;
+}
+
+.instasaver-reels-btn:hover .instasaver-reels-icon {
+  background: linear-gradient(135deg, #fd1d1d 0%, #833ab4 100%) !important;
+  border-color: transparent !important;
+  transform: scale(1.12) !important;
+  box-shadow: 0 6px 20px rgba(253, 29, 29, 0.5) !important;
+}
+
+.instasaver-reels-btn:active .instasaver-reels-icon {
+  transform: scale(0.94) !important;
+}
+
+.instasaver-reels-btn.downloading .instasaver-reels-icon {
+  background: #16a34a !important;
+  border-color: #22c55e !important;
+}
+
+/* ==============================================================
+   3. BOTÃO NOS STORIES E DESTAQUES (Barra Superior de Controles)
+   ============================================================== */
+.instasaver-story-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 7px !important;
@@ -86,7 +170,8 @@ section:hover .instasaver-float-btn,
   -webkit-backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   border-radius: 20px !important;
-  padding: 7px 15px !important;
+  padding: 6px 14px !important;
+  margin: 0 8px !important;
   color: #ffffff !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
   font-size: 12.5px !important;
@@ -94,6 +179,7 @@ section:hover .instasaver-float-btn,
   cursor: pointer !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
   transition: all 0.2s ease !important;
+  z-index: 2147483647 !important;
 }
 
 .instasaver-story-btn:hover {
@@ -110,7 +196,9 @@ section:hover .instasaver-float-btn,
   pointer-events: none !important;
 }
 
-/* 3. Botão Compacto na Grade do Perfil (Grid Thumbnails) */
+/* ==============================================================
+   4. BOTÃO COMPACTO NA GRADE DO PERFIL (Grid Thumbnails)
+   ============================================================== */
 .instasaver-grid-btn {
   position: absolute !important;
   bottom: 8px !important;
@@ -156,7 +244,9 @@ a:hover > .instasaver-grid-btn,
   opacity: 1 !important;
 }
 
-/* 4. Notificação Toast */
+/* ==============================================================
+   5. NOTIFICAÇÃO TOAST
+   ============================================================== */
 .instasaver-toast {
   position: fixed !important;
   bottom: 24px !important;
