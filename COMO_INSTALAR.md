@@ -1,65 +1,52 @@
-# 🚀 InstaSaver Pro - Como Instalar no Google Chrome
+# 🚀 InstaSaver Pro v2.0 - Guia de Instalação e Uso
 
-Esta extensão foi desenvolvida sob medida para baixar **Vídeos e Fotos do Instagram (Feed, Reels, Stories e Destaques)** com **1 clique**, aproveitando a **compressão otimizada e leve do Instagram** (perfeita para WhatsApp, reposts rápidos e catálogo sem pesar no celular ou computador).
+Extensão profissional para Google Chrome criada para baixar vídeos e Reels do Instagram em formato **MP4 (H.264 + Áudio AAC Estéreo)** compatíveis 100% nativamente com **QuickTime Player, CapCut, Premiere, TikTok e YouTube Shorts**.
 
 ---
 
-## 📥 Passo a Passo para Ativar no Chrome (Leva 30 segundos)
+## 📥 Como Atualizar / Instalar no Google Chrome
 
-Como esta é uma extensão personalizada sem anúncios e focada no seu fluxo de trabalho, você a instala direto pelo **Modo do Desenvolvedor** do Google Chrome:
+### Se você já tem a extensão adicionada no Chrome:
+1. Abra uma nova aba no Chrome e digite:
+   ```text
+   chrome://extensions
+   ```
+2. No card do **InstaSaver Pro**, clique no botão **Atualizar 🔄** (ou no botão "Atualizar" no topo da página).
+3. Verifique que a versão mudou para **`2.0.0`**.
+4. Volte para a aba do Instagram e aperte **F5** (Atualizar a página).
 
-### 1️⃣ Abra a tela de Extensões do Chrome
-* No Google Chrome, digite na barra de endereços:
-  ```text
-  chrome://extensions
-  ```
-  *(Ou clique no menu de 3 pontinhos no canto superior direito > **Extensões** > **Gerenciar Extensões**).*
+---
 
-### 2️⃣ Ative o "Modo do Desenvolvedor"
-* No canto superior direito da página de extensões, **ative a chavinha "Modo do desenvolvedor"** (Developer mode).
-
-### 3️⃣ Carregue a Pasta da Extensão
-* No canto superior esquerdo, clique no botão **"Carregar sem compactação"** (Load unpacked).
-* Selecione a pasta localizada na sua Área de Trabalho:
-  ```text
-  Área de Trabalho > InstaSaver-Pro
-  ```
-* Pronto! O ícone do **InstaSaver Pro** aparecerá na sua lista de extensões.
-
-### 4️⃣ Fixe o Ícone no Navegador (Recomendado)
-* Clique no ícone de "quebra-cabeça" (Extensões) ao lado da barra de endereços do Chrome.
-* Clique no ícone de **alfinete 📌** ao lado de **InstaSaver Pro** para deixá-lo sempre visível.
+### Se for instalar pela primeira vez:
+1. Acesse: `chrome://extensions` no Google Chrome.
+2. No canto superior direito, ative a chave **"Modo do desenvolvedor"** (*Developer mode*).
+3. No canto superior esquerdo, clique no botão **"Carregar sem compactação"** (*Load unpacked*).
+4. Selecione a pasta:
+   ```text
+   InstaSaver-Pro (em Desktop/01 - Projetos & Sistemas/InstaSaver-Pro)
+   ```
+5. Fixe o ícone 📌 na barra de extensões do Chrome.
 
 ---
 
 ## 🎯 Como Usar no Dia a Dia
 
-### Método 1: Botões Diretos na Tela do Instagram (Mais Rápido)
-Quando você abrir o [instagram.com](https://www.instagram.com/) no seu computador:
-* **Nos Stories e Destaques:** No topo da tela (ao lado dos botões de som e pause), surgirá o botão **`[⬇ Baixar Story]`** ou **`[⬇ Baixar Destaque]`**. Basta clicar nele e o vídeo/foto atual será salvo instantaneamente.
-* **No Feed e Publicações:** Logo abaixo de cada post (ao lado do botão de salvar/favoritar), haverá um ícone elegante de download. Clique nele para salvar a mídia.
-* **Nos Reels:** Na coluna lateral direita de ações, você verá o botão **`[Baixar]`**.
+### 1. Baixar Qualquer Vídeo do Feed ou Reels (1 Clique)
+* Passe o mouse em cima de qualquer vídeo ou Reel que estiver assistindo.
+* O botão flutuante **`[ ⬇ Baixar Vídeo (MP4) ]`** aparecerá no canto superior direito.
+* Clique nele. O download começará e salvará o arquivo com **áudio original e vídeo em alta resolução**.
+* Dê dois cliques no arquivo: **ele abrirá perfeitamente no QuickTime do Mac e nos editores!**
 
----
+### 2. Baixar Vídeos do Perfil do Cliente em Lote (Para YouTube / TikTok)
+* Abra o perfil do cliente ou empresa no Instagram (ex: `https://www.instagram.com/nome_do_cliente/reels/`).
+* Clique no ícone do **InstaSaver Pro** na barra do navegador.
+* Clique na aba **"Perfil em Lote"**.
+* Clique em **"🔄 Rolar Página (Carregar Mais Vídeos)"** para que os reels sejam indexados.
+* Clique em **"⬇ Baixar Todos os Vídeos Detectados"**. A extensão baixará toda a sequência de vídeos em fila para sua pasta Downloads.
 
-### Método 2: Pelo Menu da Extensão (Popup)
-1. Abra qualquer vídeo, carrossel, story ou post no Instagram.
-2. Clique no ícone do **InstaSaver Pro** no Chrome.
-3. A extensão detectará automaticamente o que está na tela:
-   * Mostra miniatura do vídeo com o selo **MP4**.
-   * Botão individual **"Baixar"** para cada item.
-   * Botão **"Baixar Todos os Itens"** caso haja múltiplos vídeos na página ou carrossel.
-4. Você também pode clicar na aba **"Colar Link"** para colar qualquer link de post/reel diretamente.
+### 3. Baixar Stories e Destaques
+* Ao abrir qualquer Story ou Destaque, olhe no topo do player.
+* O botão **`[ ⬇ Baixar Story ]`** ou **`[ ⬇ Baixar Destaque ]`** estará lá para baixar a mídia ativa instantaneamente.
 
----
-
-## 💡 Por que a Compressão do Instagram é Tão Boa?
-* Quando você posta um vídeo em 4K ou ProRes pesado de 500 MB no Instagram, os servidores da Meta aplicam algoritmos de compressão de ponta (H.264/AV1 com taxa de bits adaptativa).
-* O vídeo fica com **5 MB a 15 MB**, mantendo nitidez visual excelente para telas e celulares.
-* O **InstaSaver Pro** baixa exatamente esse arquivo renderizado, permitindo que você envie por WhatsApp sem travar e reaproveite em outros canais com rapidez total.
-
----
-
-## 🛡️ Segurança e Privacidade
-* **100% Grátis & Sem Anúncios:** Não há propagandas, redirecionamentos ou rastreadores.
-* **Código Aberto e Transparente:** O código roda inteiramente no seu navegador, sem enviar seus dados para servidores externos.
+### 4. Na Grade do Perfil (Grid)
+* Ao navegar pela grade de publicações de qualquer perfil, cada miniatura de post tem um botão circular de download no canto inferior direito ao passar o mouse.

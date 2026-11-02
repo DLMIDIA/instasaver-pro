@@ -1,28 +1,30 @@
 /**
- * InstaSaver Pro - Content Script (v1.3.0)
- * Injeta botões com prioridade máxima e consulta o script inject.js (mundo MAIN)
- * para obter o arquivo MP4 em H.264 com áudio direto do React Fiber da Meta.
+ * InstaSaver Pro - Content Script (v2.0.0)
+ * Injeta botões no Feed, Reels, Stories, Destaques e Grade de Perfis.
+ * Comunica-se com o inject.js (mundo MAIN) para obter o vídeo H.264 original com som.
  */
 
 (function () {
   'use strict';
 
-  let videoCounter = 0;
+  let reqIdCounter = 0;
+  let elementIdCounter = 0;
 
-  const DOWNLOAD_SVG = `
-    <svg viewBox="0 0 24 24">
+  const SVG_DOWNLOAD = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
       <polyline points="7 10 12 15 17 10"></polyline>
       <line x1="12" y1="15" x2="12" y2="3"></line>
     </svg>
   `;
 
-  const CHECK_SVG = `
-    <svg viewBox="0 0 24 24">
+  const SVG_CHECK = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="20 6 9 17 4 12"></polyline>
     </svg>
   `;
 
+  // Toast flutuante de status
   function showToast(message, isSuccess = true) {
     let toast = document.getElementById('instasaver-toast-elem');
     if (!toast) {
@@ -32,89 +34,116 @@
       document.body.appendChild(toast);
     }
 
-    toast.className = 'instasaver-toast' + (isSuccess ? ' success' : '');
+    toast.className = 'instasaver-toast' + (isSuccess ? ' success' : ' error');
     toast.innerHTML = isSuccess
-      ? `<span style="color:#22c55e;font-size:16px;">✓</span> <span>${message}</span>`
-      : `<span style="color:#ef4444;font-size:16px;">✕</span> <span>${message}</span>`;
+      ? `<span class="toast-icon">✓</span> <span>${message}</span>`
+      : `<span class="toast-icon">✕</span> <span>${message}</span>`;
 
     toast.classList.add('show');
     clearTimeout(toast._timeout);
     toast._timeout = setTimeout(() => {
       toast.classList.remove('show');
-    }, 3800);
+    }, 4000);
   }
 
-  // Consulta o script no mundo MAIN para ler o React Fiber
-  function queryMainWorldVideoUrl(videoId, postCode) {
+  // Ponte assíncrona com o inject.js
+  function callInjectEngine(action, payload = {}) {
     return new Promise((resolve) => {
-      let resolved = false;
+      const requestId = 'req_' + (++reqIdCounter) + '_' + Date.now();
 
-      const handler = (e) => {
-        if (e.detail && e.detail.videoId === videoId) {
-          window.removeEventListener('instasaver_video_response', handler);
-          resolved = true;
-          resolve(e.detail.url || null);
+      const listener = (e) => {
+        if (e.detail && e.detail.requestId === requestId) {
+          window.removeEventListener('instasaver_response', listener);
+          resolve(e.detail);
         }
       };
 
-      window.addEventListener('instasaver_video_response', handler);
+      window.addEventListener('instasaver_response', listener);
 
-      window.dispatchEvent(new CustomEvent('instasaver_query_video', {
-        detail: { videoId, postCode }
+      window.dispatchEvent(new CustomEvent('instasaver_request', {
+        detail: { ...payload, action, requestId }
       }));
 
-      // Timeout de segurança de 300ms
+      // Timeout de segurança de 3 segundos
       setTimeout(() => {
-        if (!resolved) {
-          window.removeEventListener('instasaver_video_response', handler);
-          resolve(null);
-        }
-      }, 300);
+        window.removeEventListener('instasaver_response', listener);
+        resolve({ success: false, timeout: true });
+      }, 3500);
     });
   }
 
-  function triggerDownload(url, filename, btn) {
+  // Extrai o shortcode de um elemento do DOM ou da URL atual
+  function detectShortcode(element) {
+    // 1. Procura em links <a> próximos
+    const postLink = element.closest('article')?.querySelector('a[href*="/p/"], a[href*="/reel/"]') ||
+                     element.parentElement?.querySelector('a[href*="/p/"], a[href*="/reel/"]') ||
+                     document.querySelector('div[role="dialog"] a[href*="/p/"], div[role="dialog"] a[href*="/reel/"]');
+
+    if (postLink && postLink.href) {
+      const m = postLink.href.match(/\/(p|reel)\/([a-zA-Z0-9_-]+)/);
+      if (m && m[2]) return m[2];
+    }
+
+    // 2. Se a aba atual estiver em /p/ ou /reel/
+    const urlMatch = window.location.pathname.match(/\/(p|reel)\/([a-zA-Z0-9_-]+)/);
+    if (urlMatch && urlMatch[2]) return urlMatch[2];
+
+    return null;
+  }
+
+  // Executa o download oficial através do background service worker
+  function requestDownload(url, filename, btn) {
+    if (!url) {
+      showToast('URL de vídeo não encontrada.', false);
+      if (btn) btn.classList.remove('downloading');
+      return;
+    }
+
     chrome.runtime.sendMessage({
       action: 'DOWNLOAD_MEDIA',
       url: url,
       filename: filename
     }, (res) => {
       if (res && res.success) {
-        btn.innerHTML = `${CHECK_SVG}<span>✓ Baixado!</span>`;
-        showToast('✓ Download iniciado com sucesso!', true);
-        setTimeout(() => {
-          btn.classList.remove('downloading');
-          btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
-        }, 3000);
+        if (btn) {
+          btn.innerHTML = `${SVG_CHECK}<span>✓ Baixado!</span>`;
+          setTimeout(() => {
+            btn.classList.remove('downloading');
+            btn.innerHTML = `${SVG_DOWNLOAD}<span>Baixar Vídeo (MP4)</span>`;
+          }, 3500);
+        }
+        showToast('✓ Download iniciado (H.264 + Áudio AAC)!', true);
       } else {
-        showToast('Erro ao iniciar download: ' + (res?.error || 'Tente novamente'), false);
-        btn.classList.remove('downloading');
-        btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+        showToast('Erro no download: ' + (res?.error || 'Tente novamente'), false);
+        if (btn) {
+          btn.classList.remove('downloading');
+          btn.innerHTML = `${SVG_DOWNLOAD}<span>Baixar Vídeo (MP4)</span>`;
+        }
       }
     });
   }
 
-  // ===============================================
-  // INJEÇÃO NOS VÍDEOS
-  // ===============================================
-  function injectButtonsOnVideos() {
+  // ==============================================================
+  // 1. BOTÃO FLUTUANTE EM VÍDEOS (Feed, Reels e Modal)
+  // ==============================================================
+  function injectFloatingButtonsOnVideos() {
     const videos = document.querySelectorAll('video');
 
     videos.forEach(video => {
       if (video.dataset.instasaverInjected === 'true') return;
 
-      const vidId = 'is_vid_' + (++videoCounter);
-      video.dataset.instasaverId = vidId;
+      const elementId = 'is_elem_' + (++elementIdCounter);
+      video.dataset.instasaverId = elementId;
 
+      // Localiza o container mais adequado para fixar o botão relativo
       let container = video.parentElement;
       while (container && container.tagName !== 'ARTICLE' && container.tagName !== 'BODY') {
-        const pos = window.getComputedStyle(container).position;
-        if (pos === 'relative' || pos === 'absolute') {
+        const style = window.getComputedStyle(container);
+        if (style.position === 'relative' || style.position === 'absolute') {
           break;
         }
         container = container.parentElement;
       }
-
       if (!container) container = video.parentElement;
       if (!container) return;
 
@@ -128,10 +157,11 @@
       const btn = document.createElement('button');
       btn.className = 'instasaver-float-btn';
       btn.type = 'button';
-      btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
-      btn.title = 'Baixar vídeo completo em MP4 com áudio';
+      btn.innerHTML = `${SVG_DOWNLOAD}<span>Baixar Vídeo (MP4)</span>`;
+      btn.title = 'Baixar vídeo original completo com áudio estéreo (H.264 + AAC)';
 
-      const handleDownloadClick = async (e) => {
+      const handleClick = async (e) => {
+        // Bloqueia qualquer captura e parada do Instagram
         e.stopPropagation();
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -139,67 +169,45 @@
         if (btn.classList.contains('downloading')) return;
 
         btn.classList.add('downloading');
-        btn.innerHTML = `${CHECK_SVG}<span>Baixando...</span>`;
-        showToast('Localizando arquivo de vídeo...');
+        btn.innerHTML = `${SVG_DOWNLOAD}<span>Buscando MP4...</span>`;
+        showToast('Localizando arquivo com áudio original...');
 
-        // Identifica o código do post
-        let code = null;
-        const postLink = video.closest('article')?.querySelector('a[href*="/p/"], a[href*="/reel/"]') ||
-                         document.querySelector('a[href*="/p/"], a[href*="/reel/"]');
-        if (postLink) {
-          const match = postLink.href.match(/\/(p|reel)\/([^/]+)/);
-          if (match && match[2]) code = match[2];
-        } else if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
-          const parts = window.location.pathname.split('/').filter(Boolean);
-          if (parts[1]) code = parts[1];
-        }
+        const shortcode = detectShortcode(video);
 
-        const filename = `insta_${code || 'video'}_${Date.now()}.mp4`;
+        // Consulta a engine in-page (inject.js)
+        const response = await callInjectEngine('GET_MEDIA_FOR_SHORTCODE', {
+          shortcode,
+          domSelector: `[data-instasaver-id="${elementId}"]`
+        });
 
-        // 1. Tenta pegar a URL H.264 diretamente do React Fiber / Cache da página
-        let finalUrl = await queryMainWorldVideoUrl(vidId, code);
+        if (response && response.success && response.item && response.item.videoUrl) {
+          const item = response.item;
+          const userPrefix = item.username ? `insta_${item.username}_` : 'insta_';
+          const codePart = item.code || shortcode || 'video';
+          const filename = `${userPrefix}${codePart}_${Date.now()}.mp4`;
 
-        // 2. Se não achou no Fiber, tenta OpenGraph
-        if (!finalUrl) {
-          const og = document.querySelector('meta[property="og:video"]');
-          if (og && og.content) finalUrl = og.content;
-        }
-
-        // 3. Se não achou, consulta as URLs capturadas pelo Background Service Worker
-        if (!finalUrl) {
-          const bgRes = await new Promise(resolve => {
-            chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, resolve);
-          });
-          if (bgRes && bgRes.url) finalUrl = bgRes.url;
-        }
-
-        // 4. Último recurso: URL direta do elemento
-        if (!finalUrl && video.src && video.src.startsWith('http') && !video.src.startsWith('blob:')) {
-          finalUrl = video.src;
-        }
-
-        if (finalUrl) {
-          triggerDownload(finalUrl, filename, btn);
+          btn.innerHTML = `${SVG_CHECK}<span>Baixando...</span>`;
+          requestDownload(item.videoUrl, filename, btn);
         } else {
-          showToast('Dê play no vídeo por 1 segundo e clique novamente.', false);
+          showToast('Não foi possível capturar o MP4 com som deste vídeo.', false);
           btn.classList.remove('downloading');
-          btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar Vídeo (MP4)</span>`;
+          btn.innerHTML = `${SVG_DOWNLOAD}<span>Baixar Vídeo (MP4)</span>`;
         }
       };
 
-      // Prioridade máxima de captura
+      // Prioridade máxima de evento
       btn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.stopImmediatePropagation(); }, true);
       btn.addEventListener('mousedown', (e) => { e.stopPropagation(); e.stopImmediatePropagation(); }, true);
-      btn.addEventListener('click', handleDownloadClick, true);
+      btn.addEventListener('click', handleClick, true);
 
       container.appendChild(btn);
       video.dataset.instasaverInjected = 'true';
     });
   }
 
-  // ===============================================
-  // INJEÇÃO EM STORIES E DESTAQUES
-  // ===============================================
+  // ==============================================================
+  // 2. BOTÃO NOS STORIES E DESTAQUES
+  // ==============================================================
   function injectStoriesButton() {
     const isStories = window.location.pathname.startsWith('/stories/');
     if (!isStories) return;
@@ -213,36 +221,42 @@
     const btn = document.createElement('button');
     btn.className = 'instasaver-story-btn';
     btn.type = 'button';
-    btn.innerHTML = `${DOWNLOAD_SVG}<span>Baixar ${isHighlight ? 'Destaque' : 'Story'}</span>`;
-    btn.title = 'Baixar a mídia em exibição agora';
+    btn.innerHTML = `${SVG_DOWNLOAD}<span>Baixar ${isHighlight ? 'Destaque' : 'Story'}</span>`;
+    btn.title = 'Baixar o Story ou Destaque em exibição com qualidade original';
 
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       e.stopImmediatePropagation();
       e.preventDefault();
 
+      btn.classList.add('downloading');
+      showToast(`Localizando ${isHighlight ? 'Destaque' : 'Story'}...`);
+
       const activeVideo = document.querySelector('section video, div[role="dialog"] video');
       const activeImg = document.querySelector('section img[decoding="sync"], div[role="dialog"] img[style*="object-fit"]');
-      const filename = `insta_${isHighlight ? 'destaque' : 'story'}_${Date.now()}`;
 
-      let url = null;
+      let resolvedUrl = null;
+      let isVideo = Boolean(activeVideo);
+
       if (activeVideo) {
-        url = await queryMainWorldVideoUrl(activeVideo.dataset.instasaverId, null);
+        const res = await callInjectEngine('GET_ALL_VIDEOS');
+        if (res && res.videos && res.videos.length > 0) {
+          resolvedUrl = res.videos[0].videoUrl;
+        }
       }
 
-      if (!url) {
-        const bgRes = await new Promise(resolve => {
-          chrome.runtime.sendMessage({ action: 'GET_LATEST_VIDEO' }, resolve);
-        });
-        if (bgRes && bgRes.url) url = bgRes.url;
+      if (!resolvedUrl && activeImg && activeImg.src) {
+        resolvedUrl = activeImg.src;
+        isVideo = false;
       }
 
-      if (url) {
-        triggerDownload(url, `${filename}.mp4`, btn);
-      } else if (activeImg && activeImg.src) {
-        triggerDownload(activeImg.src, `${filename}.jpg`, btn);
+      if (resolvedUrl) {
+        const ext = isVideo ? 'mp4' : 'jpg';
+        const filename = `insta_${isHighlight ? 'destaque' : 'story'}_${Date.now()}.${ext}`;
+        requestDownload(resolvedUrl, filename, btn);
       } else {
         showToast('Mídia não encontrada neste Story.', false);
+        btn.classList.remove('downloading');
       }
     }, true);
 
@@ -252,14 +266,69 @@
     storyContainer.appendChild(btn);
   }
 
-  // Observer
+  // ==============================================================
+  // 3. BOTÕES RÁPIDOS NA GRADE DE PERFIL E REELS (LOTE / GRID)
+  // ==============================================================
+  function injectGridDownloadButtons() {
+    // Detecta se estamos num perfil (/usuario/ ou /usuario/reels/)
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const isProfile = pathParts.length >= 1 && !['explore', 'stories', 'direct', 'reels', 'p'].includes(pathParts[0]);
+    if (!isProfile) return;
+
+    // Procura links de post na grade
+    const gridLinks = document.querySelectorAll('a[href*="/p/"]:not(.is-grid-processed), a[href*="/reel/"]:not(.is-grid-processed)');
+
+    gridLinks.forEach(link => {
+      link.classList.add('is-grid-processed');
+
+      const match = link.href.match(/\/(p|reel)\/([a-zA-Z0-9_-]+)/);
+      if (!match || !match[2]) return;
+      const shortcode = match[2];
+
+      // Cria botão compacto de download na miniatura
+      const gridBtn = document.createElement('button');
+      gridBtn.className = 'instasaver-grid-btn';
+      gridBtn.type = 'button';
+      gridBtn.innerHTML = SVG_DOWNLOAD;
+      gridBtn.title = 'Baixar este vídeo em 1 clique';
+
+      gridBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
+
+        gridBtn.classList.add('downloading');
+        showToast('Buscando vídeo da publicação...');
+
+        const res = await callInjectEngine('GET_MEDIA_FOR_SHORTCODE', { shortcode });
+        if (res && res.success && res.item && res.item.videoUrl) {
+          const item = res.item;
+          const user = item.username || pathParts[0] || 'perfil';
+          const filename = `insta_${user}_${shortcode}_${Date.now()}.mp4`;
+          requestDownload(item.videoUrl, filename, gridBtn);
+        } else {
+          showToast('Vídeo não disponível ou em formato de foto.', false);
+          gridBtn.classList.remove('downloading');
+        }
+      }, true);
+
+      gridBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); }, true);
+      gridBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); }, true);
+
+      link.style.position = 'relative';
+      link.appendChild(gridBtn);
+    });
+  }
+
+  // Loop de escaneamento contínuo
   let scanScheduled = false;
   function scheduleScan() {
     if (scanScheduled) return;
     scanScheduled = true;
     requestAnimationFrame(() => {
-      injectButtonsOnVideos();
+      injectFloatingButtonsOnVideos();
       injectStoriesButton();
+      injectGridDownloadButtons();
       scanScheduled = false;
     });
   }
@@ -271,5 +340,42 @@
   });
 
   scheduleScan();
+
+  // ==============================================================
+  // 4. COMUNICAÇÃO COM O POPUP DA EXTENSÃO
+  // ==============================================================
+  chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+    if (req.action === 'GET_PAGE_MEDIA_INFO') {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const isStories = window.location.pathname.startsWith('/stories/');
+      const isReel = window.location.pathname.includes('/reel/');
+      const isPost = window.location.pathname.includes('/p/');
+      const isProfile = pathParts.length >= 1 && !['explore', 'stories', 'direct', 'reels', 'p'].includes(pathParts[0]);
+
+      const currentShortcode = detectShortcode(document.body);
+      const currentUsername = isProfile ? pathParts[0] : null;
+
+      // Consulta inject.js para obter a lista atualizada
+      callInjectEngine('GET_ALL_VIDEOS').then(res => {
+        sendResponse({
+          success: true,
+          pageType: isStories ? 'stories' : (isReel ? 'reel' : (isPost ? 'post' : (isProfile ? 'profile' : 'feed'))),
+          shortcode: currentShortcode,
+          username: currentUsername,
+          videos: (res && res.videos) || []
+        });
+      });
+      return true;
+    }
+
+    if (req.action === 'AUTO_SCROLL_PROFILE') {
+      // Rola a página para que o Instagram carregue mais vídeos via fetch
+      window.scrollBy({ top: window.innerHeight * 1.5, behavior: 'smooth' });
+      setTimeout(() => {
+        sendResponse({ success: true });
+      }, 700);
+      return true;
+    }
+  });
 
 })();

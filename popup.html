@@ -14,87 +14,144 @@
         <img src="icons/icon32.png" alt="InstaSaver Logo" class="brand-logo">
         <div>
           <h1 class="brand-title">InstaSaver <span>PRO</span></h1>
-          <p class="brand-subtitle">Download Preciso por Mídia</p>
+          <p class="brand-subtitle">Download H.264 + Áudio AAC</p>
         </div>
       </div>
-      <div id="statusBadge" class="status-badge">Pronto</div>
+      <div id="pageBadge" class="page-badge">Verificando...</div>
     </header>
 
-    <!-- Conteúdo Principal -->
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-media">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+        </svg>
+        Mídias na Tela
+      </button>
+      <button class="tab-btn" data-tab="tab-profile">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        Perfil em Lote
+      </button>
+      <button class="tab-btn" data-tab="tab-link">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+        </svg>
+        Link Direto
+      </button>
+    </nav>
+
+    <!-- Main Content -->
     <main class="main-content">
       <!-- Se estiver fora do Instagram -->
       <div id="outsideInstagramView" class="view-panel hidden">
-        <div class="tip-card">
-          <div class="tip-icon">🌐</div>
+        <div class="empty-box">
+          <div class="empty-icon">🌐</div>
           <h3>Abra o Instagram Web</h3>
-          <p>Acesse o Instagram no seu navegador. Os botões de download aparecerão diretamente sobre os vídeos ao passar o mouse.</p>
-          <button id="openInstaBtn" class="btn btn-primary btn-full mt-2">
+          <p>Navegue pelo Instagram no computador para detectar e baixar os vídeos com a qualidade original da Meta.</p>
+          <button id="openInstagramBtn" class="btn btn-primary btn-full mt-3">
             Abrir Instagram.com
           </button>
         </div>
       </div>
 
-      <!-- Se estiver no Instagram -->
-      <div id="instagramView" class="view-panel">
-        
-        <!-- Cartão de Vídeo em Reprodução (se houver) -->
-        <div id="focusedMediaCard" class="focused-card hidden">
-          <div class="card-header">
-            <span class="live-dot"></span>
-            <strong>Vídeo Atual na Tela</strong>
+      <!-- TAB 1: Mídias na Tela -->
+      <div id="tab-media" class="tab-panel active">
+        <!-- Vídeo Ativo / Em reprodução -->
+        <div id="activeVideoCard" class="card-video hidden">
+          <div class="card-tag">
+            <span class="pulse-dot"></span>
+            <strong>Vídeo Ativo Detectado</strong>
           </div>
-          <div class="focused-preview-box">
-            <video id="focusedVideoPreview" muted autoplay loop></video>
+          <div class="video-preview-wrapper">
+            <video id="activeVideoPreview" muted autoplay loop></video>
           </div>
-          <button id="downloadFocusedBtn" class="btn btn-gradient btn-full mt-2">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <button id="downloadActiveBtn" class="btn btn-gradient btn-full mt-2">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Baixar Este Vídeo (MP4)
+            Baixar Este Vídeo (MP4 + Áudio)
           </button>
         </div>
 
-        <!-- Instruções Rápidas de Uso -->
-        <div class="instruction-box">
-          <div class="step-item">
-            <div class="step-num">1</div>
-            <div class="step-text">
-              <strong>Passe o mouse sobre qualquer vídeo</strong>
-              <p>No Feed, Reels ou Post, o botão flutuante <code>[ ⬇ Baixar Vídeo (MP4) ]</code> aparece no canto superior direito.</p>
+        <!-- Instruções e Recursos Rápidos -->
+        <div class="tips-box">
+          <div class="tip-row">
+            <div class="tip-num">1</div>
+            <div>
+              <strong>Botão Flutuante em Cada Vídeo</strong>
+              <p>Ao passar o mouse sobre qualquer Reels ou post do feed, clique no botão <code>[ ⬇ Baixar Vídeo (MP4) ]</code>.</p>
             </div>
           </div>
-          <div class="step-item">
-            <div class="step-num">2</div>
-            <div class="step-text">
-              <strong>Nos Stories & Destaques</strong>
-              <p>O botão de download fica disponível no topo da tela enquanto você assiste.</p>
-            </div>
-          </div>
-          <div class="step-item">
-            <div class="step-num">3</div>
-            <div class="step-text">
-              <strong>1 Clique = 1 Arquivo Perfeito</strong>
-              <p>Baixa apenas o vídeo que você escolheu, com áudio e na compressão leve original da Meta.</p>
+          <div class="tip-row">
+            <div class="tip-num">2</div>
+            <div>
+              <strong>100% Compatível com QuickTime & CapCut</strong>
+              <p>Extrai o arquivo com codec H.264 e som estéreo AAC, ideal para replicar no YouTube Shorts e TikTok.</p>
             </div>
           </div>
         </div>
 
-        <!-- Opção de Link Direto -->
-        <div class="link-section">
-          <label class="section-label">Ou cole o link direto de um Reel/Post:</label>
-          <div class="input-row">
-            <input type="text" id="directLinkInput" placeholder="https://www.instagram.com/reel/..." spellcheck="false">
-            <button id="goLinkBtn" class="btn btn-secondary btn-sm">Abrir</button>
+        <!-- Lista de Vídeos Recentes Detectados -->
+        <div class="section-title-row">
+          <span>Vídeos Detectados na Sessão:</span>
+          <span id="detectedCountBadge" class="count-badge">0</span>
+        </div>
+        <div id="recentVideosList" class="videos-list">
+          <!-- Injetado dinamicamente -->
+        </div>
+      </div>
+
+      <!-- TAB 2: Perfil em Lote -->
+      <div id="tab-profile" class="tab-panel">
+        <div class="profile-header-card">
+          <div class="profile-info">
+            <div id="profileUserText" class="profile-user">@perfil_da_empresa</div>
+            <div class="profile-desc">Baixe todos os vídeos e reels do perfil do seu cliente de uma só vez.</div>
           </div>
+          <div class="profile-actions">
+            <button id="scrollMoreBtn" class="btn btn-secondary btn-full">
+              🔄 Rolar Página (Carregar Mais Vídeos)
+            </button>
+            <button id="downloadAllProfileBtn" class="btn btn-gradient btn-full mt-2">
+              ⬇ Baixar Todos os Vídeos Detectados
+            </button>
+          </div>
+        </div>
+
+        <div id="profileVideosGrid" class="profile-grid">
+          <!-- Miniaturas com botão de download individual -->
+        </div>
+      </div>
+
+      <!-- TAB 3: Colar Link Direto -->
+      <div id="tab-link" class="tab-panel">
+        <div class="link-box">
+          <label class="input-label" for="linkInput">Cole o link do Reel ou Post:</label>
+          <div class="input-row">
+            <input type="text" id="linkInput" placeholder="https://www.instagram.com/reel/..." spellcheck="false">
+            <button id="pasteBtn" class="btn btn-secondary btn-sm">Colar</button>
+          </div>
+          <button id="fetchLinkBtn" class="btn btn-gradient btn-full mt-3">
+            Acessar e Baixar Mídia
+          </button>
         </div>
       </div>
     </main>
 
-    <!-- Footer com Versão Dinâmica -->
+    <!-- Footer -->
     <footer class="app-footer">
-      <span id="appVersionText">InstaSaver Pro v1.3.0 • 100% Grátis & Sem Anúncios</span>
+      <span class="badge-h264">H.264 + AAC</span>
+      <span id="versionText">InstaSaver Pro v2.0.0 • DL Mídia</span>
     </footer>
   </div>
 
